@@ -817,75 +817,75 @@ export default function Dashboard({
   return (
     <div ref={dashboardRootRef} className={`relative flex h-full min-h-0 flex-col overflow-hidden bg-white font-sans ${mobilePreview ? '' : 'md:flex-row'}`}>
 
-      {/* --- NATIVE MOBILE APP TOP BAR (< md) --- */}
-      <header
-        className={`relative z-30 flex h-14 flex-shrink-0 items-center justify-between gap-2 bg-transparent px-3.5 ${
-          mobilePreview ? '' : 'md:hidden'
-        } ${
-          ['profile', 'transactions', 'monthly'].includes(activeTab) ? 'hidden' : ''
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => handleTabSwitch('profile')}
-          aria-label="Open profile"
-          className="flex min-w-0 items-center gap-2 border-0 bg-transparent py-1 text-left shadow-none focus-visible:outline-none"
-        >
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/90 bg-white shadow-sm">
-            <img
-              src={user?.photoDataUrl || sharebillsIcon}
-              alt=""
-              className="h-full w-full rounded-full object-cover"
-            />
-          </span>
-          <div className="min-w-0">
-            <span className="block truncate text-sm font-bold leading-tight text-slate-900">
-              Hi, <span className="font-extrabold text-slate-900">{user?.username || 'there'}</span>
-            </span>
-            <span className="block truncate text-sm font-semibold leading-tight text-blue-600">
-              {new Date().getHours() < 12
-                ? 'Good Morning'
-                : new Date().getHours() < 18
-                  ? 'Good Afternoon'
-                  : 'Good Evening'}
-            </span>
-          </div>
-        </button>
-
-        <div className="flex flex-shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleActivityToggle}
-            title="Activity notifications"
-            aria-label="Activity notifications"
-            aria-expanded={isActivityOpen}
-            className={`relative flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(15,23,42,0.12)] ring-1 transition-all active:scale-95 ${
-              isActivityOpen
-                ? 'border-blue-500 bg-blue-50 text-blue-600 ring-blue-200'
-                : 'border-slate-300 bg-white text-slate-400 ring-slate-200 hover:border-blue-300 hover:text-blue-600'
-            }`}
-          >
-            <Bell
-              size={15}
-              className={
-                isActivityOpen
-                  ? 'fill-blue-600/20 text-blue-600'
-                  : unreadNotifications.length > 0
-                    ? 'text-blue-600'
-                    : 'text-slate-400'
-              }
-            />
-            {unreadNotifications.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-extrabold leading-none text-white shadow-sm">
-                {unreadNotifications.length > 99 ? '99+' : unreadNotifications.length}
-              </span>
-            )}
-          </button>
-        </div>
-      </header>
-
       {/* --- MAIN CONTENT AREA --- */}
       <main className={`relative z-10 min-w-0 flex-1 scrollbar-hide ${mobilePreview ? 'overflow-hidden pb-0' : 'overscroll-y-contain overflow-y-auto pb-24 md:order-2 md:pb-8'}`}>
+        {/* --- NATIVE MOBILE APP TOP BAR (< md) --- */}
+        <header
+          className={`relative z-30 flex h-14 flex-shrink-0 items-center justify-between gap-2 bg-transparent px-3.5 ${
+            mobilePreview ? '' : 'md:hidden'
+          } ${
+            ['profile', 'transactions', 'monthly'].includes(activeTab) ? 'hidden' : ''
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => handleTabSwitch('profile')}
+            aria-label="Open profile"
+            className="flex min-w-0 items-center gap-2 border-0 bg-transparent py-1 text-left shadow-none focus-visible:outline-none"
+          >
+            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/90 bg-white shadow-sm">
+              <img
+                src={user?.photoDataUrl || sharebillsIcon}
+                alt=""
+                className="h-full w-full rounded-full object-cover"
+              />
+            </span>
+            <div className="min-w-0">
+              <span className="block truncate text-sm font-bold leading-tight text-slate-900">
+                Hi, <span className="font-extrabold text-slate-900">{user?.username || 'there'}</span>
+              </span>
+              <span className="block truncate text-sm font-semibold leading-tight text-blue-600">
+                {new Date().getHours() < 12
+                  ? 'Good Morning'
+                  : new Date().getHours() < 18
+                    ? 'Good Afternoon'
+                    : 'Good Evening'}
+              </span>
+            </div>
+          </button>
+
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleActivityToggle}
+              title="Activity notifications"
+              aria-label="Activity notifications"
+              aria-expanded={isActivityOpen}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(15,23,42,0.12)] ring-1 transition-all active:scale-95 ${
+                isActivityOpen
+                  ? 'border-blue-500 bg-blue-50 text-blue-600 ring-blue-200'
+                  : 'border-slate-300 bg-white text-slate-400 ring-slate-200 hover:border-blue-300 hover:text-blue-600'
+              }`}
+            >
+              <Bell
+                size={15}
+                className={
+                  isActivityOpen
+                    ? 'fill-blue-600/20 text-blue-600'
+                    : unreadNotifications.length > 0
+                      ? 'text-blue-600'
+                      : 'text-slate-400'
+                }
+              />
+              {unreadNotifications.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-extrabold leading-none text-white shadow-sm">
+                  {unreadNotifications.length > 99 ? '99+' : unreadNotifications.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </header>
+
         {(activeTab === 'groups' || activeTab === 'spaces' || activeTab === 'transactions') && (
           <div
             className={`mx-auto max-w-[1360px] ${mobilePreview ? 'p-3.5' : 'p-3.5 sm:p-5 md:px-6 md:pb-6 lg:px-8 lg:pb-8'} ${

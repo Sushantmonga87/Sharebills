@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { Check, Play, Upload, Volume2 } from 'lucide-react';
-import { playNotificationSound } from '../../utils/notificationSound';
+import { Check, Play, Volume2 } from 'lucide-react';
+import {
+  DEFAULT_NOTIFICATION_SOUND,
+  playNotificationSound,
+} from '../../utils/notificationSound';
 
 const PRESETS = [
   { id: 'chime', name: 'Chime', description: 'Bright two-note tone' },
@@ -8,18 +11,12 @@ const PRESETS = [
   { id: 'bell', name: 'Bell', description: 'Short bell-like tone' },
 ];
 
-const DEFAULT_SOUND = { mode: 'preset', preset: 'chime' };
-const MAX_CUSTOM_AUDIO_SIZE = 200 * 1024;
-
 export default function NotificationSoundSettings({
   user,
   onUpdateUser,
   sharedSounds = [],
 }) {
-  const [sound, setSound] = useState(user?.notificationSound || DEFAULT_SOUND);
-  const [customAudio, setCustomAudio] = useState(
-    user?.notificationSound?.mode === 'custom' ? user.notificationSound : null
-  );
+  const [sound, setSound] = useState(user?.notificationSound || DEFAULT_NOTIFICATION_SOUND);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const isSelected = (tone) => (
@@ -27,32 +24,6 @@ export default function NotificationSoundSettings({
       ? sound.mode === 'shared' && sound.soundId === tone.soundId
       : sound.mode === tone.mode && sound.preset === tone.preset
   );
-
-  const handleCustomAudio = (event) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('audio/')) {
-      setFeedback('Choose an audio file.');
-      return;
-    }
-    if (file.size > MAX_CUSTOM_AUDIO_SIZE) {
-      setFeedback('Choose an audio file smaller than 200 KB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        setFeedback('Could not read this audio file.');
-        return;
-      }
-      setCustomAudio({ mode: 'custom', dataUrl: reader.result, name: file.name });
-      setFeedback('');
-    };
-    reader.onerror = () => setFeedback('Could not read this audio file.');
-    reader.readAsDataURL(file);
-  };
 
   const preview = async (tone) => {
     setFeedback('');
@@ -92,15 +63,14 @@ export default function NotificationSoundSettings({
         <div>
           <h3 className="text-xs font-bold text-slate-900">Notification tone</h3>
           <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-            Custom tones play for alerts while Sharebills is open. Background push sounds are controlled by your device.
+            Selected tones play for alerts while Sharebills is open. Background push sounds are controlled by your device.
           </p>
         </div>
       </div>
 
-      <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-200/70 p-1">
+      <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-200/70 p-1">
         {[
           { id: 'preset', label: 'Predefined' },
-          { id: 'custom', label: 'Custom' },
           { id: 'off', label: 'None' },
         ].map((option) => (
           <button
@@ -109,18 +79,22 @@ export default function NotificationSoundSettings({
             aria-pressed={option.id === 'off'
               ? sound.mode === 'off'
               : option.id === 'preset'
-                ? sound.mode === 'preset' || sound.mode === 'shared'
+                ? sound.mode !== 'off'
                 : sound.mode === option.id}
             onClick={() => {
               if (option.id === 'off') {
                 save({ mode: 'off' });
                 return;
               }
-              setSound((current) => ({ ...current, mode: option.id }));
+              setSound((current) => (
+                current.mode === 'off'
+                  ? { ...DEFAULT_NOTIFICATION_SOUND }
+                  : current
+              ));
             }}
             disabled={saving}
             className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-              (sound.mode === option.id || (option.id === 'preset' && sound.mode === 'shared'))
+              (sound.mode === option.id || (option.id === 'preset' && sound.mode !== 'off'))
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
@@ -130,7 +104,7 @@ export default function NotificationSoundSettings({
         ))}
       </div>
 
-      {sound.mode === 'preset' || sound.mode === 'shared' ? (
+      {sound.mode !== 'off' ? (
         <div className="space-y-2">
           {[
             ...PRESETS.map((preset) => ({
@@ -182,45 +156,6 @@ export default function NotificationSoundSettings({
               </div>
             );
           })}
-        </div>
-      ) : sound.mode === 'custom' ? (
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-800">
-                {customAudio?.name || 'Choose a custom notification tune'}
-              </p>
-              <p className="mt-0.5 text-[10px] text-slate-500">Audio file · up to 200 KB</p>
-            </div>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
-              <Upload size={13} />
-              {customAudio ? 'Replace tune' : 'Choose tune'}
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleCustomAudio}
-                className="sr-only"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => preview(customAudio)}
-              disabled={!customAudio?.dataUrl}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Play preview
-            </button>
-            <button
-              type="button"
-              onClick={() => save(customAudio)}
-              disabled={saving || !customAudio?.dataUrl}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
-            >
-              {saving ? 'Saving…' : 'Save custom tone'}
-            </button>
-          </div>
         </div>
       ) : (
         <p className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">

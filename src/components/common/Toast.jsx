@@ -6,7 +6,7 @@ export default function Toast({ toast }) {
   const isError = toast.type === 'error';
 
   return (
-    <div className="fixed bottom-16 md:bottom-6 right-4 left-4 md:left-auto max-w-sm mx-auto md:mx-0 z-50 animate-in slide-in-from-bottom-2 duration-150 pointer-events-none">
+    <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 left-4 md:left-auto max-w-sm mx-auto md:mx-0 z-[60] animate-in slide-in-from-bottom-2 duration-150 pointer-events-none">
       <div
         className={`px-3.5 py-2.5 rounded-xl shadow-lg flex items-center gap-2.5 text-xs font-semibold border pointer-events-auto ${
           isError

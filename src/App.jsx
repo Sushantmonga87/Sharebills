@@ -32,8 +32,10 @@ import {
   unregisterPushNotifications,
 } from './utils/notifications';
 import {
+  DEFAULT_NOTIFICATION_SOUND,
   NOTIFICATION_SOUND_ADMIN_EMAIL,
   playNotificationSound,
+  unlockNotificationAudio,
 } from './utils/notificationSound';
 
 const GroupView = lazy(() => import('./components/group/GroupView'));
@@ -265,6 +267,25 @@ export default function App() {
   const isLandingPageVisible = !activeUser && !authMode && !isStandalonePwa;
   const isLightWelcomeVisible = !activeUser && (isLandingPageVisible || isStandalonePwa);
 
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction, true);
+      window.removeEventListener('touchstart', handleFirstInteraction, true);
+      window.removeEventListener('keydown', handleFirstInteraction, true);
+      unlockNotificationAudio().catch((error) => {
+        console.warn('Could not prepare notification audio:', error);
+      });
+    };
+    window.addEventListener('pointerdown', handleFirstInteraction, { capture: true, passive: true });
+    window.addEventListener('touchstart', handleFirstInteraction, { capture: true, passive: true });
+    window.addEventListener('keydown', handleFirstInteraction, true);
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction, true);
+      window.removeEventListener('touchstart', handleFirstInteraction, true);
+      window.removeEventListener('keydown', handleFirstInteraction, true);
+    };
+  }, []);
+
   useLayoutEffect(() => {
     const isDarkMode = theme === 'dark' && !isLightWelcomeVisible;
     document.documentElement.classList.toggle('dark', isDarkMode);
@@ -343,13 +364,9 @@ export default function App() {
 
     let isActive = true;
     let unsubscribe;
-    listenToForegroundMessages((payload) => {
+    listenToForegroundMessages(() => {
       if (!isActive) return;
-      const title = payload.notification?.title || payload.data?.title || 'Sharebills';
-      const message = payload.notification?.body || payload.data?.message || 'You have a new update.';
-      setToast({ message: `${title}: ${message}`, type: 'success', brandIcon: true });
-      window.setTimeout(() => setToast(null), 3000);
-      const selectedSound = activeUser?.notificationSound;
+      const selectedSound = activeUser?.notificationSound || DEFAULT_NOTIFICATION_SOUND;
       const soundToPlay = selectedSound?.mode === 'shared'
         ? sharedNotificationSounds?.find((sound) => sound.id === selectedSound.soundId)
         : selectedSound;
