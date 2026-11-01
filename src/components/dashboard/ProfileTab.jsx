@@ -31,6 +31,8 @@ import {
 import { auth } from '../../firebase';
 import { Button, Input } from '../common/UI';
 import { requestNotificationPermission, triggerPushNotification } from '../../utils/notifications';
+import NotificationSoundPublisher from './NotificationSoundPublisher';
+import NotificationSoundSettings from './NotificationSoundSettings';
 import ProfileSettingsPanel from './ProfileSettingsPanel';
 
 export default function ProfileTab({
@@ -41,6 +43,7 @@ export default function ProfileTab({
   onThemeChange,
   showToast,
   mobilePreview = false,
+  sharedNotificationSounds = [],
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.username || '');
@@ -512,6 +515,13 @@ export default function ProfileTab({
                 </p>
               )}
 
+              <NotificationSoundSettings
+                user={user}
+                onUpdateUser={onUpdateUser}
+                sharedSounds={sharedNotificationSounds}
+              />
+              <NotificationSoundPublisher user={user} onUpdateUser={onUpdateUser} />
+
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700">
@@ -826,6 +836,8 @@ export default function ProfileTab({
             testingPush={testingPush}
             onTestPush={handleTestPush}
             testPushStatus={testPushStatus}
+            onUpdateUser={onUpdateUser}
+            sharedSounds={sharedNotificationSounds}
           />
         </div>
       )}

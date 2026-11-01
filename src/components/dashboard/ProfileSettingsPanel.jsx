@@ -1,4 +1,5 @@
 import { Bell, KeyRound, Moon, Sun } from 'lucide-react';
+import NotificationSoundSettings from './NotificationSoundSettings';
 
 export default function ProfileSettingsPanel({
   user,
@@ -16,6 +17,8 @@ export default function ProfileSettingsPanel({
   testingPush,
   onTestPush,
   testPushStatus,
+  onUpdateUser,
+  sharedSounds,
 }) {
   return (
     <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs lg:col-span-7 lg:p-7">
@@ -150,39 +153,46 @@ export default function ProfileSettingsPanel({
       </div>
 
       {canViewPushDiagnostics && (
-        <div className="mt-4 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
-                <Bell size={17} />
+        <>
+          <div className="mt-4 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
+                  <Bell size={17} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Push notification diagnostics</p>
+                  <p className="text-[11px] text-slate-500">Verify delivery and device permissions.</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-slate-900">Push notification diagnostics</p>
-                <p className="text-[11px] text-slate-500">Verify delivery and device permissions.</p>
-              </div>
+              <button
+                type="button"
+                onClick={onTestPush}
+                disabled={testingPush}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                {testingPush ? 'Testing…' : 'Test push'}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onTestPush}
-              disabled={testingPush}
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              {testingPush ? 'Testing…' : 'Test push'}
-            </button>
+            {testPushStatus && (
+              <p className={`rounded-lg border p-2.5 font-mono text-xs break-all ${
+                testPushStatus.startsWith('Success')
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : testPushStatus.startsWith('Error') || testPushStatus.startsWith('Trigger Error')
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : 'bg-slate-100 text-slate-700'
+              }`}>
+                {testPushStatus}
+              </p>
+            )}
           </div>
-          {testPushStatus && (
-            <p className={`rounded-lg border p-2.5 font-mono text-xs break-all ${
-              testPushStatus.startsWith('Success')
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : testPushStatus.startsWith('Error') || testPushStatus.startsWith('Trigger Error')
-                  ? 'border-rose-200 bg-rose-50 text-rose-700'
-                  : 'bg-slate-100 text-slate-700'
-            }`}>
-              {testPushStatus}
-            </p>
-          )}
-        </div>
+        </>
       )}
+      <NotificationSoundSettings
+        user={user}
+        onUpdateUser={onUpdateUser}
+        sharedSounds={sharedSounds}
+      />
     </section>
   );
 }

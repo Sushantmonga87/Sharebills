@@ -31,6 +31,10 @@ import {
   triggerPushNotification,
   unregisterPushNotifications,
 } from './utils/notifications';
+import {
+  NOTIFICATION_SOUND_ADMIN_EMAIL,
+  playNotificationSound,
+} from './utils/notificationSound';
 
 const GroupView = lazy(() => import('./components/group/GroupView'));
 const AdminPanel = lazy(() => import('./components/admin/AdminPanel'));
@@ -255,6 +259,9 @@ export default function App() {
   const navigateToRef = useRef(null);
   const lastExitedGroupIdRef = useRef(null);
   const activeUser = users.find((user) => user.id === activeUserId);
+  const sharedNotificationSounds = users.find(
+    (user) => user.email?.trim().toLowerCase() === NOTIFICATION_SOUND_ADMIN_EMAIL
+  )?.notificationSounds;
   const isLandingPageVisible = !activeUser && !authMode && !isStandalonePwa;
   const isLightWelcomeVisible = !activeUser && (isLandingPageVisible || isStandalonePwa);
 
@@ -342,6 +349,15 @@ export default function App() {
       const message = payload.notification?.body || payload.data?.message || 'You have a new update.';
       setToast({ message: `${title}: ${message}`, type: 'success', brandIcon: true });
       window.setTimeout(() => setToast(null), 3000);
+      const selectedSound = activeUser?.notificationSound;
+      const soundToPlay = selectedSound?.mode === 'shared'
+        ? sharedNotificationSounds?.find((sound) => sound.id === selectedSound.soundId)
+        : selectedSound;
+      if (!activeUser?.notificationsPaused && soundToPlay) {
+        playNotificationSound(soundToPlay).catch((error) => {
+          console.warn('Could not play the selected notification sound:', error);
+        });
+      }
     }).then((stopListening) => {
       if (isActive) unsubscribe = stopListening;
       else stopListening?.();
@@ -351,7 +367,13 @@ export default function App() {
       isActive = false;
       unsubscribe?.();
     };
-  }, [dataLoadStarted]);
+  }, [
+    activeUser?.email,
+    activeUser?.notificationSound,
+    activeUser?.notificationsPaused,
+    dataLoadStarted,
+    sharedNotificationSounds,
+  ]);
 
   const applyRoute = (route) => {
     currentRouteRef.current = route;

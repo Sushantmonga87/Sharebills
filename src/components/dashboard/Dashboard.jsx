@@ -45,6 +45,7 @@ import TransactionExportModal from './TransactionExportModal';
 import { calculateSettlements } from '../../utils/settlement';
 import { CATEGORIES, PAYMENT_METHODS } from '../../utils/constants';
 import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
+import { NOTIFICATION_SOUND_ADMIN_EMAIL } from '../../utils/notificationSound';
 
 export default function Dashboard({
   user,
@@ -2124,6 +2125,9 @@ export default function Dashboard({
                 <ProfileTabView
                   key={[user?.id, user?.username, user?.email, user?.upiId, user?.photoDataUrl].join(':')}
                   user={user}
+                  sharedNotificationSounds={users.find(
+                    (profile) => profile.email?.trim().toLowerCase() === NOTIFICATION_SOUND_ADMIN_EMAIL
+                  )?.notificationSounds}
                   onUpdateUser={onUpdateUser}
                   onLogout={() => setShowLogoutConfirmation(true)}
                   theme={theme}
