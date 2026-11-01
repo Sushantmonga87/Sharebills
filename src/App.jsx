@@ -260,12 +260,39 @@ export default function App() {
   const authModeRef = useRef(null);
   const navigateToRef = useRef(null);
   const lastExitedGroupIdRef = useRef(null);
+  const notificationSoundSettingsRef = useRef(null);
+  const lastNotificationSoundRef = useRef({ groupId: null, timestamp: 0 });
   const activeUser = users.find((user) => user.id === activeUserId);
   const sharedNotificationSounds = users.find(
     (user) => user.email?.trim().toLowerCase() === NOTIFICATION_SOUND_ADMIN_EMAIL
   )?.notificationSounds;
   const isLandingPageVisible = !activeUser && !authMode && !isStandalonePwa;
   const isLightWelcomeVisible = !activeUser && (isLandingPageVisible || isStandalonePwa);
+
+  useLayoutEffect(() => {
+    notificationSoundSettingsRef.current = { activeUser, sharedNotificationSounds };
+  }, [activeUser, sharedNotificationSounds]);
+
+  const playIncomingNotificationSound = useCallback((groupId) => {
+    const now = Date.now();
+    const lastPlayed = lastNotificationSoundRef.current;
+    if (groupId && lastPlayed.groupId === groupId && now - lastPlayed.timestamp < 2000) return;
+
+    const { activeUser: currentUser, sharedNotificationSounds: currentSharedSounds } =
+      notificationSoundSettingsRef.current || {};
+    if (currentUser?.notificationsPaused) return;
+
+    const selectedSound = currentUser?.notificationSound || DEFAULT_NOTIFICATION_SOUND;
+    const soundToPlay = selectedSound.mode === 'shared'
+      ? currentSharedSounds?.find((sound) => sound.id === selectedSound.soundId)
+      : selectedSound;
+    if (!soundToPlay) return;
+
+    lastNotificationSoundRef.current = { groupId: groupId || null, timestamp: now };
+    playNotificationSound(soundToPlay).catch((error) => {
+      console.warn('Could not play the selected notification sound:', error);
+    });
+  }, []);
 
   useEffect(() => {
     const handleFirstInteraction = () => {
@@ -364,17 +391,9 @@ export default function App() {
 
     let isActive = true;
     let unsubscribe;
-    listenToForegroundMessages(() => {
+    listenToForegroundMessages((payload) => {
       if (!isActive) return;
-      const selectedSound = activeUser?.notificationSound || DEFAULT_NOTIFICATION_SOUND;
-      const soundToPlay = selectedSound?.mode === 'shared'
-        ? sharedNotificationSounds?.find((sound) => sound.id === selectedSound.soundId)
-        : selectedSound;
-      if (!activeUser?.notificationsPaused && soundToPlay) {
-        playNotificationSound(soundToPlay).catch((error) => {
-          console.warn('Could not play the selected notification sound:', error);
-        });
-      }
+      playIncomingNotificationSound(payload.data?.groupId);
     }).then((stopListening) => {
       if (isActive) unsubscribe = stopListening;
       else stopListening?.();
@@ -385,11 +404,8 @@ export default function App() {
       unsubscribe?.();
     };
   }, [
-    activeUser?.email,
-    activeUser?.notificationSound,
-    activeUser?.notificationsPaused,
     dataLoadStarted,
-    sharedNotificationSounds,
+    playIncomingNotificationSound,
   ]);
 
   const applyRoute = (route) => {
@@ -638,14 +654,17 @@ export default function App() {
             ))
             .sort((first, second) => (second.timestamp || 0) - (first.timestamp || 0))[0];
 
-          if (newMessage) setIncomingChat(newMessage);
+          if (newMessage) {
+            setIncomingChat(newMessage);
+            playIncomingNotificationSound(groupId);
+          }
         },
         (error) => console.error('Incoming chat listener error:', error)
       );
     });
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [activeChatGroupId, activeUserId, joinedGroupIds, mutedGroupIds]);
+  }, [activeChatGroupId, activeUserId, joinedGroupIds, mutedGroupIds, playIncomingNotificationSound]);
 
   const loadUsersForAuth = async () => {
     if (!hasFirebase || !db || !auth) {
