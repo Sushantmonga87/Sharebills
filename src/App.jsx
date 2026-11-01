@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { Bell } from 'lucide-react';
 import {
   FieldPath,
   collection,
@@ -26,6 +27,7 @@ import Toast from './components/common/Toast';
 import IncomingChatAlert from './components/common/IncomingChatAlert';
 import {
   listenToForegroundMessages,
+  requestWebNotificationPermission,
   requestNotificationPermission,
   setPushNotificationActionHandler,
   triggerPushNotification,
@@ -186,6 +188,22 @@ export default function App() {
       || window.navigator.standalone === true
   );
   const isAppWelcomeScreen = isNativeApp || isStandalonePwa;
+  const isIosBrowser = /iPhone|iPad|iPod/i.test(window.navigator.userAgent)
+    || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+  const needsIosHomeScreenInstall = isIosBrowser && !isStandalonePwa;
+  const [webNotificationPromptOpen, setWebNotificationPromptOpen] = useState(
+    () => !isNativeApp
+      && (
+        (typeof Notification !== 'undefined' && Notification.permission === 'default')
+        || needsIosHomeScreenInstall
+      )
+  );
+  const [webNotificationPromptMessage, setWebNotificationPromptMessage] = useState(
+    () => needsIosHomeScreenInstall
+      ? 'To receive notifications on iPhone or iPad, add Sharebills to your Home Screen from Safari, then open it from its icon.'
+      : ''
+  );
+  const [pushPermissionRefresh, setPushPermissionRefresh] = useState(0);
   const [activeUserId, setActiveUserId] = useState(
     () => {
       const storedUserId = localStorage.getItem('rs_active_user_id');
@@ -1492,6 +1510,25 @@ export default function App() {
   ));
   const pushUserId = activeUser?.id;
   const pushNotificationsPaused = Boolean(activeUser?.notificationsPaused);
+  const handleEnableWebNotifications = async () => {
+    setWebNotificationPromptMessage('');
+    try {
+      const result = await requestWebNotificationPermission();
+      if (!result.success) {
+        setWebNotificationPromptMessage(result.error);
+        return;
+      }
+
+      setWebNotificationPromptOpen(false);
+      setPushPermissionRefresh((version) => version + 1);
+    } catch (error) {
+      console.error('Could not request web notification permission:', error);
+      setWebNotificationPromptMessage(
+        error instanceof Error ? error.message : 'Could not request notification permission.'
+      );
+    }
+  };
+
   useEffect(() => {
     if (!pushUserId) return;
     if (pushNotificationsPaused) {
@@ -1507,7 +1544,7 @@ export default function App() {
     requestNotificationPermission({ id: pushUserId }).then((result) => {
       if (!result.success) console.warn('Push notifications are unavailable:', result.error);
     });
-  }, [pushUserId, pushNotificationsPaused]);
+  }, [pushUserId, pushNotificationsPaused, pushPermissionRefresh]);
 
   useEffect(() => {
     const handleNotificationAction = (notification) => {
@@ -1563,6 +1600,54 @@ export default function App() {
       className="fixed inset-x-0 top-[var(--app-top,0px)] z-0 flex h-[var(--app-height,100dvh)] w-full flex-col overflow-hidden bg-white font-sans text-slate-900"
     >
       <Toast toast={toast} />
+      {webNotificationPromptOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="web-notification-prompt-title"
+            className="w-full max-w-sm rounded-3xl border border-white/80 bg-white p-6 text-slate-900 shadow-2xl"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF4EF] text-[#356447]">
+              <Bell size={23} />
+            </div>
+            <h2 id="web-notification-prompt-title" className="text-lg font-extrabold">
+              Stay in the loop
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Allow notifications so you can get updates about group expenses, messages, and settlements on this device.
+            </p>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              Your browser will ask for permission when you tap Enable. On iPhone or iPad, open Sharebills from its Home Screen icon to receive web notifications.
+            </p>
+            {webNotificationPromptMessage && (
+              <p role="alert" className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+                {webNotificationPromptMessage}
+              </p>
+            )}
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
+              {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
+                <button
+                  type="button"
+                  onClick={handleEnableWebNotifications}
+                  className="min-h-11 rounded-xl bg-[#356447] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#2C503A]"
+                >
+                  Enable notifications
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setWebNotificationPromptOpen(false)}
+                className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                {typeof Notification !== 'undefined' && Notification.permission === 'denied'
+                  ? 'Continue'
+                  : 'Not now'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {incomingChat && (
         <IncomingChatAlert
           key={incomingChat.id}

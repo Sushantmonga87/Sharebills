@@ -301,6 +301,33 @@ async function registerWebPush(userId) {
     : { success: false, error: 'The active account changed during push registration.' };
 }
 
+export async function requestWebNotificationPermission() {
+  if (!('Notification' in window)) {
+    return { success: false, error: 'This browser does not support web notifications.' };
+  }
+
+  const permission = Notification.permission === 'default'
+    ? await Notification.requestPermission()
+    : Notification.permission;
+  if (permission !== 'granted') {
+    return {
+      success: false,
+      error: permission === 'denied'
+        ? 'Notifications are blocked. Allow them for this site in your browser settings.'
+        : 'Notification permission was not granted.',
+    };
+  }
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !(await isSupported())) {
+    return {
+      success: false,
+      error: 'Web push is not supported in this browser context. On iPhone or iPad, add Sharebills to your Home Screen from Safari, then open it from its icon.',
+    };
+  }
+
+  return { success: true };
+}
+
 export function requestNotificationPermission(currentUser) {
   const userId = currentUser?.id;
   if (!userId) return Promise.resolve({ success: false, error: 'No user ID logged in.' });
