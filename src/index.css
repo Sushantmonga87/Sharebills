@@ -107,6 +107,10 @@ textarea {
   pointer-events: none;
 }
 
+.overview-ledger-heading::before {
+  bottom: 0;
+}
+
 .transaction-heading-bar::before,
 .shared-spaces-heading-bar::before {
   bottom: 0;

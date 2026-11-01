@@ -1239,7 +1239,7 @@ export default function Dashboard({
             }`}>
               {/* 1. Desktop Top Command Bar with Activity on Top Right */}
               <div
-                className={`page-heading-bar liquid-glass relative flex flex-col gap-3 rounded-3xl p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:px-5 ${
+                className={`page-heading-bar liquid-glass relative flex flex-col gap-3 rounded-3xl px-4 py-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:px-5 ${
                   isNewMenuOpen ? 'z-[60]' : 'z-10'
                 } ${
                   activeTab === 'groups' ? '' : 'hidden'
@@ -1570,8 +1570,8 @@ export default function Dashboard({
                     }`}
                   >
                     {activeTab !== 'transactions' && <>
-                    <div className={`page-heading-bar mb-4 flex flex-wrap items-center justify-between gap-2.5 ${
-                      activeTab === 'transactions' ? '' : 'border-b border-slate-200/60 pb-3.5'
+                    <div className={`page-heading-bar overview-ledger-heading mb-4 flex flex-wrap items-center justify-between gap-2.5 ${
+                      activeTab === 'groups' ? 'pb-3.5' : ''
                     }`}>
                       {activeTab === 'transactions' ? (
                         <>
