@@ -254,7 +254,7 @@ export default function AuthScreen({
         setIsForgotPassword(false);
         setIsLogin(true);
         setIdentifier(cleanIdentifier);
-        setNotice('If an account uses this email, a password reset link is on its way.');
+        setNotice('If an account uses this email, a password reset link is on its way. Please check spam folder if not recieved');
         return;
       }
 
@@ -299,7 +299,7 @@ export default function AuthScreen({
             }
             await onSaveUser({ ...matchedUser, password: '' });
             if (!credential.user.emailVerified) {
-              setNotice(`A verification link was sent to ${userEmail}. Verify your email before signing in.`);
+              setNotice(`A verification link was sent to ${userEmail}. Verify your email before signing in. Check spam folder, if not recieved`);
               return;
             }
             onLogin(matchedUser.id);
@@ -311,7 +311,7 @@ export default function AuthScreen({
         const credential = await signInWithEmailAndPassword(auth, userEmail, password);
         if (!credential.user.emailVerified) {
           await sendEmailVerification(credential.user);
-          setNotice(`A verification link was sent to ${userEmail}. Verify your email before signing in.`);
+          setNotice(`A verification link was sent to ${userEmail}. Verify your email before signing in. Check spam folder, if not recieved`);
           return;
         }
         if (matchedUser.password) await onSaveUser({ ...matchedUser, password: '' });
