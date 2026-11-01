@@ -454,13 +454,29 @@ export async function triggerPushNotification({
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Push delivery failed (${response.status}): ${detail}`);
+    const bodyText = await response.text();
+    let body;
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      body = { error: bodyText };
+    }
+    const detail = [body.error, body.details]
+      .filter((value) => typeof value === 'string' && value)
+      .join(': ') || `Push service returned HTTP ${response.status}.`;
+    const failures = Array.isArray(body.failures)
+      ? body.failures.map(({ status, code }) => [status, code].filter(Boolean).join(' ')).join(', ')
+      : '';
+    throw new Error(`Push delivery failed (${response.status}): ${detail}${failures ? ` (${failures})` : ''}`);
   }
 
   const result = await response.json();
   if (!result.success || result.count < 1) {
-    throw new Error(result.message || 'Push API accepted the request but delivered no notifications.');
+    throw new Error(
+      result.error
+      || result.message
+      || `Push service found no registered device tokens for recipient ${recipientId}.`
+    );
   }
 
   return result;

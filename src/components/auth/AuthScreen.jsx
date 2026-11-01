@@ -176,7 +176,7 @@ export default function AuthScreen({
         (item) => item.email?.trim().toLowerCase() === userEmail
       );
       if (existingUser) {
-        onLogin(existingUser.id);
+        onLogin(existingUser.id, existingUser);
         return;
       }
 
@@ -199,7 +199,7 @@ export default function AuthScreen({
       };
       await onSaveUser(newUser);
 
-      onLogin(newUser.id);
+      onLogin(newUser.id, newUser);
     } catch (authError) {
       console.error('Google sign-in failed:', authError);
       if (authError.code === 'auth/popup-closed-by-user') return;
@@ -238,7 +238,7 @@ export default function AuthScreen({
             setError('Invalid email/username or password.');
             return;
           }
-          onLogin(localUser.id);
+          onLogin(localUser.id, localUser);
           return;
         }
         setError('Account creation requires Firebase email verification. Please try again when connected.');
@@ -272,7 +272,7 @@ export default function AuthScreen({
             setError('Invalid email/username or password.');
             return;
           }
-          onLogin(legacyUser.id);
+          onLogin(legacyUser.id, legacyUser);
           return;
         }
 
@@ -282,12 +282,12 @@ export default function AuthScreen({
             setError('Invalid email/username or password.');
             return;
           }
-          onLogin(matchedUser.id);
+          onLogin(matchedUser.id, matchedUser);
           return;
         }
 
         if (matchedUser.password === password && password.length < 6) {
-          onLogin(matchedUser.id);
+          onLogin(matchedUser.id, matchedUser);
           return;
         }
 
@@ -302,7 +302,7 @@ export default function AuthScreen({
               setNotice(`A verification link was sent to ${userEmail}. Verify your email before signing in. Check spam folder, if not recieved`);
               return;
             }
-            onLogin(matchedUser.id);
+            onLogin(matchedUser.id, matchedUser);
             return;
           } catch (migrationError) {
             if (migrationError.code !== 'auth/email-already-in-use') throw migrationError;
@@ -315,7 +315,7 @@ export default function AuthScreen({
           return;
         }
         if (matchedUser.password) await onSaveUser({ ...matchedUser, password: '' });
-        onLogin(matchedUser.id);
+        onLogin(matchedUser.id, matchedUser);
         return;
       }
 

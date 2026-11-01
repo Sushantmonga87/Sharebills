@@ -47,14 +47,47 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 const NAVIGATION_CACHE = 'sharebills-navigation-v1';
+const ICON_CACHE = 'sharebills-icons-v1';
+const OFFLINE_ICONS = [
+  '/favicon.webp',
+  '/sharebills-icon-192.webp',
+  '/sharebills-icon-512.webp',
+  '/sharebills-maskable-192.webp',
+  '/sharebills-maskable-512.webp',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(ICON_CACHE);
+    await cache.addAll(OFFLINE_ICONS);
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET' || request.mode !== 'navigate') return;
+  if (request.method !== 'GET') return;
 
   const requestUrl = new URL(request.url);
   if (requestUrl.origin !== self.location.origin) return;
 
+  if (OFFLINE_ICONS.includes(requestUrl.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(ICON_CACHE);
+      const cachedIcon = await cache.match(request, { ignoreSearch: true });
+      if (cachedIcon) return cachedIcon;
+      const response = await fetch(request);
+      if (response.ok) await cache.put(requestUrl.pathname, response.clone());
+      return response;
+    })());
+    return;
+  }
+
+  if (request.mode !== 'navigate') return;
   event.respondWith((async () => {
     const cache = await caches.open(NAVIGATION_CACHE);
     try {

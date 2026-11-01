@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   Lock,
   Mail,
@@ -124,6 +125,38 @@ export default function ProfileTab({
     } finally {
       setTestingPush(false);
     }
+  };
+
+  const handleSendCampaign = async ({ title, message, imageDataUrl, imageUrl }) => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || firebaseUser.isAnonymous) {
+      throw new Error('Sign in with the verified admin email before sending a campaign.');
+    }
+
+    const idToken = await firebaseUser.getIdToken(true);
+    const broadcastUrl = Capacitor.isNativePlatform()
+      ? 'https://sharebills.in/api/admin/broadcast'
+      : '/api/admin/broadcast';
+    const response = await fetch(broadcastUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        senderId: user.id,
+        title,
+        message,
+        ...(imageDataUrl ? { imageDataUrl } : {}),
+        ...(imageUrl ? { imageUrl } : {}),
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || `Campaign request failed (${response.status}).`);
+    }
+    return result;
   };
 
   const handleEnablePush = async () => {
@@ -574,6 +607,7 @@ export default function ProfileTab({
                 className="mt-4"
                 testingPush={testingPush}
                 onTestPush={handleTestPush}
+                onSendCampaign={handleSendCampaign}
                 testPushStatus={testPushStatus}
                 pushSetupStatus={pushSetupStatus}
                 settingUpPush={settingUpPush}
@@ -783,6 +817,7 @@ export default function ProfileTab({
             pushSetupStatus={pushSetupStatus}
             settingUpPush={settingUpPush}
             onEnablePush={handleEnablePush}
+            onSendCampaign={handleSendCampaign}
             resetPasswordLoading={resetPasswordLoading}
             onSendPasswordReset={handleSendPasswordReset}
             resetPasswordFeedback={resetPasswordFeedback}

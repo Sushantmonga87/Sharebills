@@ -138,6 +138,19 @@ export default function ActivityTab({
                       {getNotificationIcon(displayMessage)}
                     </div>
                     <div className="min-w-0">
+                      {notification.type === 'CAMPAIGN' && notification.title && (
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                          {notification.title}
+                        </p>
+                      )}
+                      {notification.type === 'CAMPAIGN' && notification.imageUrl && (
+                        <img
+                          src={notification.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          className="mb-2 mt-1.5 max-h-48 w-full rounded-lg border border-slate-200 object-cover"
+                        />
+                      )}
                       <p className="text-xs sm:text-sm font-semibold text-slate-900 leading-snug">
                         {displayMessage}
                       </p>

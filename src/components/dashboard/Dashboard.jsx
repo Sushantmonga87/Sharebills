@@ -2285,6 +2285,19 @@ export default function Dashboard({
                           {isSelected ? <Check size={14} /> : isDispute ? <AlertTriangle size={13} /> : isChat ? <MessageSquare size={13} /> : isRent ? <Home size={13} /> : <Receipt size={13} />}
                         </div>
                         <div className="min-w-0">
+                          {n.type === 'CAMPAIGN' && n.title && (
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-blue-700">
+                              {n.title}
+                            </p>
+                          )}
+                          {n.type === 'CAMPAIGN' && n.imageUrl && (
+                            <img
+                              src={n.imageUrl}
+                              alt=""
+                              loading="lazy"
+                              className="mb-1.5 mt-1 max-h-32 w-full rounded-lg border border-slate-200 object-cover"
+                            />
+                          )}
                           <p className="text-xs font-semibold text-slate-900 leading-snug">
                             {n.message || 'New activity in your space'}
                           </p>
@@ -2321,6 +2334,18 @@ export default function Dashboard({
                   className="w-full max-w-sm overflow-hidden rounded-3xl border border-white/80 bg-white/95 p-2 shadow-2xl backdrop-blur-2xl"
                   onClick={(event) => event.stopPropagation()}
                 >
+                  {activityContextNotification.type === 'CAMPAIGN' && activityContextNotification.title && (
+                    <p className="px-3 pt-2 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                      {activityContextNotification.title}
+                    </p>
+                  )}
+                  {activityContextNotification.type === 'CAMPAIGN' && activityContextNotification.imageUrl && (
+                    <img
+                      src={activityContextNotification.imageUrl}
+                      alt=""
+                      className="mx-3 mt-2 max-h-40 max-w-[calc(100%-1.5rem)] rounded-lg object-contain"
+                    />
+                  )}
                   <p className="line-clamp-2 px-3 py-2 text-xs font-medium text-slate-500">
                     {activityContextNotification.message || 'Activity'}
                   </p>

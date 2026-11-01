@@ -3,10 +3,15 @@ const SESSION_SECONDS = 8 * 60 * 60;
 const MAX_RECORD_BYTES = 850 * 1024;
 const MAX_LIST_SIZE = 500;
 const ROOM_SPLIT_FIREBASE_PROJECT_ID = 'roomsplit-test';
+const DEFAULT_FIREBASE_STORAGE_BUCKET = 'roomsplit-test.firebasestorage.app';
+const BROADCAST_ADMIN_EMAIL = 'staranveer178@gmail.com';
+const CAMPAIGN_BATCH_SIZE = 25;
 const PUSH_ALLOWED_ORIGINS = new Set([
   'https://split-bills.taranveer.in',
   'https://sharebills.in',
   'https://www.sharebills.in',
+  'https://localhost',
+  'http://localhost',
   'capacitor://localhost',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -256,9 +261,9 @@ function pemToBytes(pem) {
   }
 }
 
-async function getAccessToken(env) {
+async function getAccessToken(env, includeStorage = false) {
   const serviceAccount = getServiceAccount(env);
-  const cacheKey = `${serviceAccount.projectId}:${serviceAccount.clientEmail}`;
+  const cacheKey = `${serviceAccount.projectId}:${serviceAccount.clientEmail}:${includeStorage ? 'storage' : 'messaging'}`;
   if (tokenCache?.key === cacheKey && tokenCache.expiresAt > Date.now() + 60_000) return tokenCache.value;
   if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
     throw new Error('Firebase Admin credentials are not configured');
@@ -269,7 +274,11 @@ async function getAccessToken(env) {
     encodeBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })),
     encodeBase64Url(JSON.stringify({
       iss: serviceAccount.clientEmail,
-      scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging',
+      scope: [
+        'https://www.googleapis.com/auth/datastore',
+        'https://www.googleapis.com/auth/firebase.messaging',
+        ...(includeStorage ? ['https://www.googleapis.com/auth/devstorage.read_write'] : []),
+      ].join(' '),
       aud: 'https://oauth2.googleapis.com/token',
       iat: now,
       exp: now + 3600,
@@ -405,6 +414,350 @@ async function handleDataRequest(request, env, collectionName) {
     body: JSON.stringify({ fields: toFirestoreFields(record) }),
   });
   return jsonResponse({ record: sanitizeRecord(collectionName, documentFromFirestore(updated)) });
+}
+
+async function listAllUsers(env) {
+  const users = [];
+  let pageToken = '';
+
+  do {
+    const params = new URLSearchParams({ pageSize: String(MAX_LIST_SIZE) });
+    if (pageToken) params.set('pageToken', pageToken);
+    const result = await firestoreRequest(env, `users?${params}`);
+    users.push(...(result.documents || []).map((document) => ({
+      ...documentFromFirestore(document),
+      updateTime: document.updateTime,
+    })));
+    pageToken = result.nextPageToken || '';
+  } while (pageToken);
+
+  return users;
+}
+
+function getCampaignImageUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  if (value.length > 2048) throw new Error('Image URL must be 2048 characters or fewer');
+
+  let url;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error('Enter a valid public HTTPS image URL');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new Error('Enter a valid public HTTPS image URL');
+  }
+  return url.href;
+}
+
+async function uploadCampaignImage(env, serviceAccount, accessToken, dataUrl, campaignId) {
+  if (typeof dataUrl !== 'string' || !dataUrl) return '';
+  const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/i);
+  if (!match) throw new Error('Campaign image must be a JPEG, PNG, or WebP image');
+
+  const encodedImage = match[2];
+  if (encodedImage.length > 700_000) throw new Error('Campaign image must be 500 KB or smaller');
+
+  const bucket = env.FIREBASE_STORAGE_BUCKET || DEFAULT_FIREBASE_STORAGE_BUCKET;
+  const objectName = `campaigns/${campaignId}.${match[1].toLowerCase() === 'image/png' ? 'png' : match[1].toLowerCase() === 'image/webp' ? 'webp' : 'jpg'}`;
+  const downloadToken = crypto.randomUUID();
+  const imageBytes = Uint8Array.from(atob(encodedImage), (character) => character.charCodeAt(0));
+  const uploadUrl = new URL(
+    `/upload/storage/v1/b/${encodeURIComponent(bucket)}/o`,
+    'https://storage.googleapis.com',
+  );
+  uploadUrl.searchParams.set('uploadType', 'media');
+  uploadUrl.searchParams.set('name', objectName);
+  const response = await fetch(
+    uploadUrl,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': match[1].toLowerCase(),
+      },
+      body: imageBytes,
+    },
+  );
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error('Campaign image upload failed:', {
+      status: response.status,
+      message: result.error?.message || 'Cloud Storage upload failed',
+    });
+    throw new Error('Could not upload the campaign image. Check Firebase Storage configuration and try again.');
+  }
+
+  const metadataUrl = new URL(
+    `/storage/v1/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(objectName)}`,
+    'https://storage.googleapis.com',
+  );
+  const metadataResponse = await fetch(metadataUrl, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ metadata: { firebaseStorageDownloadTokens: downloadToken } }),
+  });
+  if (!metadataResponse.ok) {
+    const metadataError = await metadataResponse.json().catch(() => ({}));
+    console.error('Campaign image token setup failed:', {
+      status: metadataResponse.status,
+      message: metadataError.error?.message || 'Cloud Storage metadata update failed',
+    });
+    throw new Error('Could not finish publishing the campaign image. Please try again.');
+  }
+
+  const imageUrl = new URL(
+    `/v0/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(objectName)}`,
+    'https://firebasestorage.googleapis.com',
+  );
+  imageUrl.searchParams.set('alt', 'media');
+  imageUrl.searchParams.set('token', downloadToken);
+  return imageUrl.href;
+}
+
+async function sendCampaignPush(env, request, serviceAccount, accessToken, user, title, message, campaignId, imageUrl) {
+  const tokens = [...new Set(
+    (Array.isArray(user.fcmTokens) ? user.fcmTokens : [])
+      .filter((token) => typeof token === 'string' && token.trim())
+      .map((token) => token.trim()),
+  )];
+  if (!tokens.length) return { sent: 0, failed: 0, staleTokens: [] };
+
+  const results = await Promise.all(tokens.map(async (token) => {
+    try {
+      const response = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(serviceAccount.projectId)}/messages:send`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: {
+              token,
+              notification: { title, body: message, ...(imageUrl ? { image: imageUrl } : {}) },
+              data: {
+                campaignId,
+                groupId: '',
+                recipientId: user.id,
+                url: '/',
+              },
+              android: {
+                priority: 'HIGH',
+                notification: {
+                  channel_id: 'default',
+                  sound: 'default',
+                  icon: 'ic_stat_sharebills',
+                  color: '#3E7754',
+                  ...(imageUrl ? { image: imageUrl } : {}),
+                },
+              },
+              webpush: {
+                headers: { Urgency: 'high' },
+                fcm_options: { link: new URL('/', request.url).href },
+                ...(imageUrl ? { notification: { image: imageUrl } } : {}),
+              },
+              apns: {
+                headers: { 'apns-priority': '10' },
+                ...(imageUrl ? { fcm_options: { image: imageUrl } } : {}),
+                payload: { aps: { sound: 'default' } },
+              },
+            },
+          }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      const stale = result.error?.status === 'UNREGISTERED'
+        || result.error?.details?.some((detail) => detail.errorCode === 'UNREGISTERED');
+      return { sent: response.ok, stale, token };
+    } catch (error) {
+      console.error('Campaign push request failed:', error instanceof Error ? error.message : 'Unknown error');
+      return { sent: false, stale: false, token };
+    }
+  }));
+
+  const staleTokens = results.filter((result) => result.stale).map((result) => result.token);
+  if (staleTokens.length && user.updateTime) {
+    try {
+      await saveUserPushTokens(
+        env,
+        user.id,
+        tokens.filter((token) => !staleTokens.includes(token)),
+        user.updateTime,
+      );
+    } catch (error) {
+      console.error('Could not remove stale campaign push tokens:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  return {
+    sent: results.filter((result) => result.sent).length,
+    failed: results.filter((result) => !result.sent).length,
+    staleTokens,
+  };
+}
+
+async function handleBroadcastRequest(request, env) {
+  let payload;
+  try {
+    payload = await parseRequestJson(request);
+  } catch (error) {
+    return jsonResponse({ error: error.message }, 400);
+  }
+
+  const title = typeof payload?.title === 'string' ? payload.title.trim() : '';
+  const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
+  const senderId = typeof payload?.senderId === 'string' ? payload.senderId.trim() : '';
+  let imageUrl;
+  try {
+    imageUrl = payload?.imageDataUrl
+      ? ''
+      : getCampaignImageUrl(payload?.imageUrl);
+  } catch (error) {
+    return jsonResponse({ error: error.message }, 400);
+  }
+  if (!title || title.length > 120) {
+    return jsonResponse({ error: 'Title is required and must be 120 characters or fewer' }, 400);
+  }
+  if (!message || message.length > 500) {
+    return jsonResponse({ error: 'Message is required and must be 500 characters or fewer' }, 400);
+  }
+  if (!senderId || senderId.length > 128 || senderId.includes('/')) {
+    return jsonResponse({ error: 'A valid sender account is required' }, 400);
+  }
+
+  const authorization = request.headers.get('Authorization') || '';
+  const idToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!idToken || !env.FIREBASE_WEB_API_KEY) {
+    return jsonResponse({ error: 'Firebase authentication is required' }, 401);
+  }
+
+  try {
+    const authResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(env.FIREBASE_WEB_API_KEY)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      },
+    );
+    const authResult = await authResponse.json();
+    const authenticatedUser = authResult.users?.[0];
+    if (!authResponse.ok || !authenticatedUser) {
+      return jsonResponse({ error: 'A valid Firebase sign-in is required' }, 401);
+    }
+    if (
+      authenticatedUser.emailVerified !== true
+      || authenticatedUser.email?.trim().toLowerCase() !== BROADCAST_ADMIN_EMAIL
+    ) {
+      return jsonResponse({ error: 'Only the verified campaign administrator can send broadcasts' }, 403);
+    }
+
+    const serviceAccount = getServiceAccount(env);
+    if (serviceAccount.projectId !== ROOM_SPLIT_FIREBASE_PROJECT_ID) {
+      return jsonResponse({ error: 'Firebase project configuration does not match the app' }, 503);
+    }
+    const senderDocument = await firestoreRequest(env, `users/${encodeURIComponent(senderId)}`);
+    const sender = documentFromFirestore(senderDocument);
+    if (sender.email?.trim().toLowerCase() !== authenticatedUser.email.trim().toLowerCase()) {
+      return jsonResponse({ error: 'Signed-in account does not match the sender profile' }, 403);
+    }
+
+    const users = await listAllUsers(env);
+    const campaignId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const accessToken = await getAccessToken(env, Boolean(payload?.imageDataUrl));
+    if (payload?.imageDataUrl) {
+      imageUrl = await uploadCampaignImage(
+        env,
+        serviceAccount,
+        accessToken,
+        payload.imageDataUrl,
+        campaignId,
+      );
+    }
+    let savedNotifications = 0;
+    let pushSent = 0;
+    let pushFailures = 0;
+    let pushSkippedUsers = 0;
+    let failedUsers = 0;
+
+    for (let offset = 0; offset < users.length; offset += CAMPAIGN_BATCH_SIZE) {
+      const batch = users.slice(offset, offset + CAMPAIGN_BATCH_SIZE);
+      const results = await Promise.all(batch.map(async (user) => {
+        try {
+          const notificationId = `campaign_${campaignId}_${user.id}`;
+          await firestoreRequest(env, `notifications?documentId=${encodeURIComponent(notificationId)}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              fields: toFirestoreFields({
+                id: notificationId,
+                recipientId: user.id,
+                senderId,
+                createdBy: senderId,
+                createdByName: sender.username || 'Sharebills',
+                type: 'CAMPAIGN',
+                title,
+                message,
+                ...(imageUrl ? { imageUrl } : {}),
+                createdAt,
+                read: false,
+              }),
+            }),
+          });
+
+          let pushResult = { sent: 0, failed: 0 };
+          if (!user.notificationsPaused) {
+            pushResult = await sendCampaignPush(
+              env,
+              request,
+              serviceAccount,
+              accessToken,
+              user,
+              title,
+              message,
+              campaignId,
+              imageUrl,
+            );
+          }
+          const hasPushTokens = Array.isArray(user.fcmTokens)
+            && user.fcmTokens.some((token) => typeof token === 'string' && token.trim());
+          return {
+            saved: true,
+            pushSent: pushResult.sent,
+            pushFailures: pushResult.failed,
+            pushSkipped: Boolean(user.notificationsPaused || !hasPushTokens),
+          };
+        } catch (error) {
+          console.error('Campaign delivery failed for a user:', error instanceof Error ? error.message : 'Unknown error');
+          return { saved: false, pushSent: 0, pushFailures: 0, pushSkipped: false };
+        }
+      }));
+
+      savedNotifications += results.filter((result) => result.saved).length;
+      failedUsers += results.filter((result) => !result.saved).length;
+      pushSent += results.reduce((count, result) => count + result.pushSent, 0);
+      pushFailures += results.reduce((count, result) => count + result.pushFailures, 0);
+      pushSkippedUsers += results.filter((result) => result.pushSkipped).length;
+    }
+
+    return jsonResponse({
+      success: true,
+      recipients: users.length,
+      savedNotifications,
+      pushSent,
+      pushFailures,
+      pushSkippedUsers,
+      failedUsers,
+    });
+  } catch (error) {
+    console.error('Campaign broadcast failed:', error instanceof Error ? error.message : 'Unknown error');
+    return jsonResponse({ error: 'Could not complete the campaign broadcast' }, 500);
+  }
 }
 
 async function handlePushRequest(request, env) {
@@ -620,7 +973,13 @@ async function handlePushRequest(request, env) {
       const errorStatus = payload.error?.status;
       const unregistered = errorStatus === 'UNREGISTERED'
         || payload.error?.details?.some((detail) => detail.errorCode === 'UNREGISTERED');
-      return { ok: response.ok, status: response.status, token, unregistered };
+      return {
+        ok: response.ok,
+        status: response.status,
+        code: errorStatus || '',
+        token,
+        unregistered,
+      };
     }));
     const count = results.filter((result) => result.ok).length;
     const staleTokens = results
@@ -638,8 +997,14 @@ async function handlePushRequest(request, env) {
       }
     }
     if (!count) {
-      console.error('FCM delivery failed:', results.map(({ status }) => status));
-      return jsonResponse({ success: false, error: 'FCM rejected all registered device tokens', count: 0 }, 502, corsHeaders);
+      const failures = results.map(({ status, code }) => ({ status, code }));
+      console.error('FCM delivery failed:', failures);
+      return jsonResponse({
+        success: false,
+        error: 'FCM rejected all registered device tokens',
+        count: 0,
+        failures,
+      }, 502, corsHeaders);
     }
     return jsonResponse({
       success: true,
@@ -666,9 +1031,32 @@ async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
   const route = url.pathname;
   const method = request.method;
+  const origin = request.headers.get('Origin');
+  const broadcastOrigins = new Set([
+    ...PUSH_ALLOWED_ORIGINS,
+    env.APP_ORIGIN || 'https://split-bills.taranveer.in',
+  ]);
+  const allowedBroadcastOrigin = route === '/api/admin/broadcast'
+    && origin
+    && broadcastOrigins.has(origin);
 
-  if (method !== 'GET' && !isSameOrigin(request)) return jsonResponse({ error: 'Origin not allowed' }, 403);
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+  if (method !== 'GET' && !isSameOrigin(request) && !allowedBroadcastOrigin) {
+    return jsonResponse({ error: 'Origin not allowed' }, 403);
+  }
+  if (method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Cache-Control': 'no-store',
+        ...(allowedBroadcastOrigin ? {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Methods': 'OPTIONS,POST',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+          Vary: 'Origin',
+        } : {}),
+      },
+    });
+  }
 
   if (route === '/api/admin/login' && method === 'POST') {
     if (!hasAdminCredentials(env)) return jsonResponse({ error: 'Admin login is not configured' }, 503);
@@ -704,6 +1092,15 @@ async function handleAdminRequest(request, env) {
       200,
       { 'Set-Cookie': sessionCookie(request, '', 0) },
     );
+  }
+
+  if (route === '/api/admin/broadcast' && method === 'POST') {
+    const response = await handleBroadcastRequest(request, env);
+    if (!allowedBroadcastOrigin) return response;
+    const headers = new Headers(response.headers);
+    headers.set('Access-Control-Allow-Origin', origin);
+    headers.set('Vary', 'Origin');
+    return new Response(response.body, { status: response.status, headers });
   }
 
   if (route === '/api/admin/data') {

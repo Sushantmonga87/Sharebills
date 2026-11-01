@@ -11,6 +11,7 @@ export default function ProfileSettingsPanel({
   pushSetupStatus,
   settingUpPush,
   onEnablePush,
+  onSendCampaign,
   resetPasswordLoading,
   onSendPasswordReset,
   resetPasswordFeedback,
@@ -145,6 +146,7 @@ export default function ProfileSettingsPanel({
         pushSetupStatus={pushSetupStatus}
         settingUpPush={settingUpPush}
         onEnablePush={onEnablePush}
+        onSendCampaign={onSendCampaign}
       />
     )}
     </>

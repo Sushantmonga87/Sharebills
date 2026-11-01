@@ -11,7 +11,7 @@
         android:right="72dp"
         android:bottom="72dp">
         <bitmap
-            android:src="@drawable/splash_square_icon"
+            android:src="@drawable/splash_logo_rounded"
             android:gravity="fill" />
     </item>
 </layer-list>

@@ -4,4 +4,5 @@
     <color name="colorPrimaryDark">#2C593D</color>
     <color name="colorAccent">#3E7754</color>
     <color name="roomsplit_splash_background">#3E7754</color>
+    <color name="roomsplit_app_background">#FFFFFF</color>
 </resources>

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Bell } from 'lucide-react';
+import { Bell, WifiOff } from 'lucide-react';
 import {
   FieldPath,
   collection,
@@ -110,6 +110,65 @@ const removeDemoExpenses = (items) => (
 
 const legacyDemoUserIds = new Set(['usr_taran', 'usr_sushant', 'usr_tushar']);
 const legacyDemoGroupId = 'grp_room302';
+const CACHED_ACTIVE_USER_KEY = 'rs_cached_active_user';
+
+const readCachedActiveUser = (userId) => {
+  if (!userId) return null;
+  try {
+    const cachedUser = JSON.parse(localStorage.getItem(CACHED_ACTIVE_USER_KEY) || 'null');
+    if (cachedUser?.id === userId) return cachedUser;
+  } catch (error) {
+    console.error('Could not restore the cached user profile:', error);
+  }
+
+  const firebaseUser = auth?.currentUser;
+  if (firebaseUser?.uid !== userId) return null;
+  return {
+    id: userId,
+    username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Roommate',
+    email: firebaseUser.email || '',
+    photoDataUrl: firebaseUser.photoURL || '',
+  };
+};
+
+const cacheActiveUser = (user) => {
+  if (!user?.id) return;
+  const safeUser = { ...user };
+  delete safeUser.password;
+  if (typeof safeUser.photoDataUrl === 'string' && safeUser.photoDataUrl.length > 250_000) {
+    safeUser.photoDataUrl = '';
+  }
+  try {
+    localStorage.setItem(CACHED_ACTIVE_USER_KEY, JSON.stringify(safeUser));
+  } catch (error) {
+    const basicProfile = {
+      id: safeUser.id,
+      username: safeUser.username || 'Roommate',
+      email: safeUser.email || '',
+      photoDataUrl: '',
+    };
+    try {
+      localStorage.setItem(CACHED_ACTIVE_USER_KEY, JSON.stringify(basicProfile));
+    } catch (fallbackError) {
+      console.error('Could not save the user profile for offline sign-in:', fallbackError || error);
+    }
+  }
+};
+
+function OfflineNotice() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-x-3 top-3 z-[140] mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-lg"
+    >
+      <WifiOff size={20} className="flex-shrink-0 text-amber-700" />
+      <p className="text-sm font-semibold">
+        No internet connection. Connect to the internet to continue. Your sign-in is saved on this device.
+      </p>
+    </div>
+  );
+}
 
 const removeLegacyDemoUsers = (items) => (
   items.filter((user) => !legacyDemoUserIds.has(user.id))
@@ -214,6 +273,17 @@ export default function App() {
       return storedUserId;
     }
   );
+  const cachedActiveUser = activeUserId ? readCachedActiveUser(activeUserId) : null;
+  const [isOnline, setIsOnline] = useState(() => window.navigator.onLine);
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(window.navigator.onLine);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(
     () => Capacitor.isNativePlatform()
@@ -231,9 +301,9 @@ export default function App() {
   const [users, setUsers] = useState(
     () => hasInitialLocalSession
       ? removeLegacyDemoUsers(readStoredData('rs_users', []))
-      : []
+      : cachedActiveUser ? [cachedActiveUser] : []
   );
-  const [usersLoaded, setUsersLoaded] = useState(hasInitialLocalSession);
+  const [usersLoaded, setUsersLoaded] = useState(hasInitialLocalSession || Boolean(cachedActiveUser));
   const [groups, setGroups] = useState(
     () => hasInitialLocalSession
       ? removeLegacyDemoGroups(readStoredData('rs_groups', []))
@@ -251,7 +321,7 @@ export default function App() {
     () => hasInitialLocalSession ? readStoredData('rs_notifications', []) : []
   );
   const [loading, setLoading] = useState(
-    () => Boolean(localStorage.getItem('rs_active_user_id') && hasFirebase && db && auth)
+    () => Boolean(localStorage.getItem('rs_active_user_id') && hasFirebase && db && auth && !cachedActiveUser)
   );
   const [dataLoadStarted, setDataLoadStarted] = useState(
     () => Boolean(localStorage.getItem('rs_active_user_id'))
@@ -560,12 +630,21 @@ export default function App() {
         if (isCancelled) return;
         unsubscribers.push(onSnapshot(collection(db, 'users'), (snapshot) => {
           const loadedUsers = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-          setUsers(loadedUsers);
-          if (activeUserId && !loadedUsers.some((user) => user.id === activeUserId)) {
+          const activeProfile = loadedUsers.find((user) => user.id === activeUserId);
+          if (activeProfile) cacheActiveUser(activeProfile);
+          if (activeUserId && !activeProfile && !snapshot.metadata.fromCache) {
             localStorage.removeItem('rs_active_user_id');
             setActiveUserId(null);
             setDataLoadStarted(false);
             setLoading(false);
+            setUsers(loadedUsers);
+          } else if (activeUserId && !activeProfile) {
+            const fallbackUser = readCachedActiveUser(activeUserId);
+            setUsers(fallbackUser
+              ? [...loadedUsers, fallbackUser]
+              : loadedUsers);
+          } else {
+            setUsers(loadedUsers);
           }
           setUsersLoaded(true);
         }, (error) => console.error('Users listener error:', error)));
@@ -604,7 +683,16 @@ export default function App() {
         }, (error) => console.error('Notifications listener error:', error)));
       } catch (error) {
         console.error('Firestore auth setup failed:', error);
-        if (!isCancelled) setLoading(false);
+        if (!isCancelled) {
+          const fallbackUser = readCachedActiveUser(activeUserId);
+          if (fallbackUser) setUsers((previous) => (
+            previous.some((user) => user.id === activeUserId)
+              ? previous
+              : [...previous, fallbackUser]
+          ));
+          setUsersLoaded(true);
+          setLoading(false);
+        }
       }
     };
 
@@ -710,7 +798,7 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleLogin = (userId) => {
+  const handleLogin = (userId, userProfile) => {
     authModeRef.current = null;
     setAuthMode(null);
     setIncomingChat(null);
@@ -730,6 +818,13 @@ export default function App() {
       setMonthlyRents(savedMonthlyRents ? JSON.parse(savedMonthlyRents) : []);
       setNotifications(savedNotifications ? JSON.parse(savedNotifications) : []);
       setLoading(false);
+    }
+    if (userProfile?.id === userId) {
+      cacheActiveUser(userProfile);
+      setUsers((previous) => upsertItemsById(previous, [userProfile]));
+    } else {
+      const currentProfile = users.find((user) => user.id === userId);
+      if (currentProfile) cacheActiveUser(currentProfile);
     }
     setActiveUserId(userId);
     localStorage.setItem('rs_active_user_id', userId);
@@ -1582,17 +1677,20 @@ export default function App() {
 
   if (window.location.pathname === '/admin') {
     return (
-      <Suspense fallback={<LaunchScreen />}>
-        <AdminPanel />
-      </Suspense>
+      <>
+        <Suspense fallback={<LaunchScreen />}>
+          <AdminPanel />
+        </Suspense>
+        {!isOnline && <OfflineNotice />}
+      </>
     );
   }
 
   if (loading) {
-    return <LaunchScreen />;
+    return <>{!isOnline && <OfflineNotice />}<LaunchScreen /></>;
   }
   if (activeUserId && !usersLoaded) {
-    return <LaunchScreen />;
+    return <>{!isOnline && <OfflineNotice />}<LaunchScreen /></>;
   }
 
   return (
@@ -1600,6 +1698,7 @@ export default function App() {
       className="fixed inset-x-0 top-[var(--app-top,0px)] z-0 flex h-[var(--app-height,100dvh)] w-full flex-col overflow-hidden bg-white font-sans text-slate-900"
     >
       <Toast toast={toast} />
+      {!isOnline && <OfflineNotice />}
       {webNotificationPromptOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
           <section

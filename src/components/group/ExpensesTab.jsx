@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Receipt,
@@ -71,6 +71,110 @@ const parseExpenseDate = (value) => {
 const getDateKey = (date) => (
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 );
+
+function SplitPillGroup({ participants, visibleLimit, showAll }) {
+  const containerRef = useRef(null);
+  const measurementContainerRef = useRef(null);
+  const nameRefs = useRef([]);
+  const moreRefs = useRef([]);
+  const [visibleCount, setVisibleCount] = useState(visibleLimit);
+  const participantCount = participants.length;
+
+  useLayoutEffect(() => {
+    if (showAll || participantCount === 0) return undefined;
+
+    const updateVisibleCount = () => {
+      const availableWidth = containerRef.current?.clientWidth || 0;
+      if (!availableWidth) return;
+
+      const gap = 4;
+      const maxCount = Math.min(visibleLimit, participantCount);
+      let fitCount = 1;
+
+      for (let count = maxCount; count >= 1; count -= 1) {
+        const namesWidth = nameRefs.current
+          .slice(0, count)
+          .reduce((width, pill) => width + (pill?.getBoundingClientRect().width || 0), 0);
+        const remainingCount = participantCount - count;
+        const moreWidth = remainingCount > 0
+          ? gap + (moreRefs.current[remainingCount]?.getBoundingClientRect().width || 0)
+          : 0;
+        const totalWidth = namesWidth + gap * (count - 1) + moreWidth;
+
+        if (totalWidth <= availableWidth) {
+          fitCount = count;
+          break;
+        }
+      }
+
+      setVisibleCount((currentCount) => (
+        currentCount === fitCount ? currentCount : fitCount
+      ));
+    };
+
+    updateVisibleCount();
+    const observer = new ResizeObserver(updateVisibleCount);
+    if (containerRef.current) observer.observe(containerRef.current);
+    if (measurementContainerRef.current) observer.observe(measurementContainerRef.current);
+    window.addEventListener('resize', updateVisibleCount);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateVisibleCount);
+    };
+  }, [participantCount, showAll, visibleLimit]);
+
+  const visibleParticipants = participants.slice(0, visibleCount);
+  const remainingCount = participants.length - visibleParticipants.length;
+  const renderNamePill = ({ id, name, isMe }, measure = false) => (
+    <span
+      key={id}
+      ref={measure ? (element) => { nameRefs.current[participants.findIndex((person) => person.id === id)] = element; } : undefined}
+      title={measure ? undefined : name}
+      className={`inline-flex flex-shrink-0 items-center whitespace-nowrap px-1.5 py-[2px] rounded-md text-[9px] font-semibold border ${
+        isMe
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+          : 'bg-slate-100 text-slate-600 border-slate-200/60'
+      }`}
+    >
+      {name}
+    </span>
+  );
+  const renderMorePill = (count, measure = false) => (
+    <span
+      key={measure ? `measure-more-${count}` : 'more'}
+      ref={measure ? (element) => { moreRefs.current[count] = element; } : undefined}
+      className="inline-block flex-shrink-0 whitespace-nowrap px-1.5 py-[2px] rounded-md text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200/60"
+    >
+      +{count} more
+    </span>
+  );
+
+  if (showAll) {
+    return (
+      <span className="inline-block flex-shrink-0 whitespace-nowrap px-1.5 py-[2px] rounded-md text-[9px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/60">
+        All
+      </span>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-1">
+      {visibleParticipants.map((participant) => renderNamePill(participant))}
+      {remainingCount > 0 && renderMorePill(remainingCount)}
+      <div
+        ref={measurementContainerRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-[-10000px] top-0 flex w-max items-center gap-1"
+      >
+        {participants.map((participant) => renderNamePill(participant, true))}
+        {Array.from({ length: participants.length }, (_, index) => (
+          renderMorePill(index + 1, true)
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ExpensesTab({
   expenses,
@@ -323,44 +427,17 @@ export default function ExpensesTab({
                     isInvolved = true;
                   }
 
-                  // Split Pill Logic
-                  let splitPills = [];
-                  if (participants.length === totalGroupMembers && totalGroupMembers > 1) {
-                    splitPills.push(
-                      <span key="all" className="inline-block px-1.5 py-[2px] rounded md text-[9px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/60">
-                        All
-                      </span>
-                    );
-                  } else {
-                    const showCount = participants.length > 3 ? 2 : participants.length;
-                    const visibleParticipants = participants.slice(0, showCount);
-                    const remainingCount = participants.length - showCount;
-
-                    splitPills = visibleParticipants.map((memberId) => {
-                      const isMe = memberId === currentUser.id;
-                      const name = isMe ? 'You' : getMemberName(memberId);
-                      return (
-                        <span
-                          key={memberId}
-                          className={`inline-block px-1.5 py-[2px] rounded-md text-[9px] font-semibold border ${
-                            isMe
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
-                              : 'bg-slate-100 text-slate-600 border-slate-200/60'
-                          }`}
-                        >
-                          {name}
-                        </span>
-                      );
-                    });
-
-                    if (remainingCount > 0) {
-                      splitPills.push(
-                        <span key="more" className="inline-block px-1.5 py-[2px] rounded-md text-[9px] font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
-                          +{remainingCount}
-                        </span>
-                      );
-                    }
-                  }
+                  const splitParticipants = participants.map((memberId) => {
+                    const isMe = memberId === currentUser.id;
+                    const fullName = isMe ? 'You' : getMemberName(memberId);
+                    return {
+                      id: memberId,
+                      name: fullName.trim().split(/\s+/)[0] || 'Roommate',
+                      isMe,
+                    };
+                  });
+                  const showAllParticipants =
+                    participants.length === totalGroupMembers && totalGroupMembers > 1;
 
                   return (
                     <ExpenseLongPressActions
@@ -413,10 +490,21 @@ export default function ExpensesTab({
                               paid <span className="font-semibold text-slate-800">{formatCurrency(exp.totalAmount, currency)}</span>
                             </p>
                             
-                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                              <span className="text-[10px] text-slate-400 font-medium">Split:</span>
-                              <div className="flex items-center gap-1">
-                                {splitPills}
+                            <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1">
+                              <span className="flex-shrink-0 text-[10px] text-slate-400 font-medium">Split:</span>
+                              <div className="hidden min-w-0 flex-1 items-center md:flex">
+                                <SplitPillGroup
+                                  participants={splitParticipants}
+                                  visibleLimit={6}
+                                  showAll={showAllParticipants}
+                                />
+                              </div>
+                              <div className="flex min-w-0 flex-1 items-center md:hidden">
+                                <SplitPillGroup
+                                  participants={splitParticipants}
+                                  visibleLimit={3}
+                                  showAll={showAllParticipants}
+                                />
                               </div>
                             </div>
                           </div>
