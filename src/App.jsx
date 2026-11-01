@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Bell, WifiOff } from 'lucide-react';
 import {
   FieldPath,
@@ -329,6 +330,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState(initialRoute.view);
   const [authMode, setAuthMode] = useState(null);
   const [dashboardTab, setDashboardTab] = useState(initialRoute.dashboardTab || 'groups');
+  const [dashboardOverlay, setDashboardOverlay] = useState(initialRoute.overlay || null);
   const [returnDashboardTab, setReturnDashboardTab] = useState(
     initialRoute.dashboardTab || 'groups'
   );
@@ -513,6 +515,9 @@ export default function App() {
     if (route.view === 'dashboard') {
       setDashboardTab(route.dashboardTab || 'groups');
       setReturnDashboardTab(route.dashboardTab || 'groups');
+      setDashboardOverlay(route.overlay || null);
+    } else {
+      setDashboardOverlay(null);
     }
   };
 
@@ -616,6 +621,30 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [initialRoute]);
+
+  useEffect(() => {
+    if (!isNativeApp || window.location.pathname === '/admin') return undefined;
+
+    let listener;
+    let isCancelled = false;
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack || window.history.state?.roomSplitRoute || window.history.state?.roomSplitSentinel) {
+        window.history.back();
+      } else {
+        navigateToRef.current?.({ view: 'dashboard', dashboardTab: 'groups' }, { replace: true });
+      }
+    }).then((registeredListener) => {
+      if (isCancelled) registeredListener.remove();
+      else listener = registeredListener;
+    }).catch((error) => {
+      console.error('Could not register Android back-button navigation:', error);
+    });
+
+    return () => {
+      isCancelled = true;
+      listener?.remove();
+    };
+  }, [isNativeApp]);
 
   useEffect(() => {
     if (window.location.pathname === '/admin' || !dataLoadStarted) return undefined;
@@ -1872,6 +1901,17 @@ export default function App() {
           user={activeUser}
           users={users}
           initialTab={dashboardTab}
+          initialOverlay={dashboardOverlay}
+          onOverlayChange={(overlay) => {
+            const route = currentRouteRef.current;
+            if (overlay) {
+              navigateTo({ ...route, overlay });
+            } else {
+              const nextRoute = { ...route };
+              delete nextRoute.overlay;
+              navigateTo(nextRoute, { replace: true });
+            }
+          }}
           groups={groups}
           expenses={expenses}
           rentRecords={monthlyRents}
@@ -1980,15 +2020,8 @@ export default function App() {
             users={users}
             currentUser={activeUser}
             dashboardTab={returnDashboardTab}
-            onBack={() => navigateTo(
-              {
-                view: 'dashboard',
-                dashboardTab: returnDashboardTab,
-              },
-              { replace: true }
-            )}
             onNavigateDashboard={(tab) => {
-              navigateTo({ view: 'dashboard', dashboardTab: tab });
+              navigateTo({ view: 'dashboard', dashboardTab: tab }, { replace: true });
             }}
             showToast={showToast}
           />

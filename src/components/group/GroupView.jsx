@@ -50,14 +50,13 @@ export default function GroupView({
   onSendNotification,
   users,
   currentUser,
-  onBack,
   onNavigateDashboard,
   dashboardTab = 'groups',
   showToast,
 }) {
   const activeTab = initialTab;
   const [rentPopupOpen, setRentPopupOpen] = useState(false);
-  const [chatPreviewId, setChatPreviewId] = useState(null);
+  const [dismissedChatPreviewId, setDismissedChatPreviewId] = useState(null);
 
   const getUserName = (userId) => users.find((user) => user.id === userId)?.username || 'Unknown';
   const sortedExpenses = useMemo(
@@ -96,22 +95,6 @@ export default function GroupView({
   );
 
   useEffect(() => {
-    window.history.pushState({ tab: activeTab }, '');
-
-    const handleHardwareBack = (e) => {
-      e.preventDefault();
-      if (activeTab !== 'expenses') {
-        onGroupTabChange?.('expenses');
-      } else {
-        onBack();
-      }
-    };
-
-    window.addEventListener('popstate', handleHardwareBack);
-    return () => window.removeEventListener('popstate', handleHardwareBack);
-  }, [activeTab, onBack, onGroupTabChange]);
-
-  useEffect(() => {
     onActiveChatChange?.(activeTab === 'chat' ? group.id : null);
     return () => onActiveChatChange?.(null);
   }, [activeTab, group.id, onActiveChatChange]);
@@ -122,10 +105,12 @@ export default function GroupView({
 
   useEffect(() => {
     if (!incomingChatMessage || incomingChatMessage.groupId !== group.id) return undefined;
-    setChatPreviewId(incomingChatMessage.id);
-    const timeout = window.setTimeout(() => setChatPreviewId(null), 7000);
+    const timeout = window.setTimeout(
+      () => setDismissedChatPreviewId(incomingChatMessage.id),
+      7000
+    );
     return () => window.clearTimeout(timeout);
-  }, [incomingChatMessage?.id, incomingChatMessage?.groupId, group.id]);
+  }, [incomingChatMessage, group.id]);
 
   const handleTabSelect = (tab) => {
     onGroupTabChange?.(tab);
@@ -194,8 +179,11 @@ export default function GroupView({
                 <button
                   type="button"
                   onClick={() => {
-                    if (chatPreviewId) onDismissIncomingChat?.();
-                    setChatPreviewId(null);
+                    if (incomingChatMessage?.groupId === group.id
+                      && dismissedChatPreviewId !== incomingChatMessage.id) {
+                      onDismissIncomingChat?.();
+                      setDismissedChatPreviewId(incomingChatMessage.id);
+                    }
                     handleTabSelect('chat');
                   }}
                   className={`flex items-center gap-1 rounded-xl px-2 py-2 text-xs font-bold transition-all sm:gap-1.5 sm:px-3 ${
@@ -221,52 +209,57 @@ export default function GroupView({
                   </span>
                   <span className="hidden sm:inline">Chat</span>
                 </button>
-                {chatPreviewId === incomingChatMessage?.id && activeTab !== 'chat' && (
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="absolute left-1/2 top-full z-[60] mt-2 w-[min(18rem,calc(100vw-1.5rem))] -translate-x-1/2 animate-in slide-in-from-top-2 fade-in duration-200"
-                  >
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_36px_rgba(15,23,42,0.2)]">
-                      <div className="flex items-start gap-2.5">
-                        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-extrabold text-blue-700">
-                          {(incomingChatMessage.senderName || getUserName(incomingChatMessage.senderId) || 'R')
-                            .charAt(0)
-                            .toUpperCase()}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onDismissIncomingChat?.();
-                            setChatPreviewId(null);
-                            handleTabSelect('chat');
-                          }}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span className="block truncate text-[11px] font-extrabold text-slate-900">
-                            {incomingChatMessage.senderName || getUserName(incomingChatMessage.senderId)}
+                {incomingChatMessage?.groupId === group.id
+                  && dismissedChatPreviewId !== incomingChatMessage.id
+                  && activeTab !== 'chat' && (
+                  createPortal(
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="fixed inset-x-3 top-[calc(var(--app-top,0px)+3.75rem)] z-[140] mx-auto w-[min(18rem,calc(100vw-1.5rem))] animate-in slide-in-from-top-2 fade-in duration-200 sm:inset-x-auto sm:right-4 sm:top-[calc(var(--app-top,0px)+5rem)] sm:w-[min(18rem,calc(100vw-2rem))]"
+                    >
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_36px_rgba(15,23,42,0.2)]">
+                        <div className="flex items-start gap-2.5">
+                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-extrabold text-blue-700">
+                            {(incomingChatMessage.senderName || getUserName(incomingChatMessage.senderId) || 'R')
+                              .charAt(0)
+                              .toUpperCase()}
                           </span>
-                          <span className="mt-0.5 block line-clamp-2 text-xs leading-relaxed text-slate-600">
-                            {incomingChatMessage.text?.trim() || (incomingChatMessage.attachmentName
-                              ? `Sent ${incomingChatMessage.attachmentName}`
-                              : 'Sent an attachment')}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onDismissIncomingChat?.();
-                            setChatPreviewId(null);
-                          }}
-                          aria-label="Dismiss chat preview"
-                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                        >
-                          <X size={14} />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDismissIncomingChat?.();
+                              setDismissedChatPreviewId(incomingChatMessage.id);
+                              handleTabSelect('chat');
+                            }}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <span className="block truncate text-[11px] font-extrabold text-slate-900">
+                              {incomingChatMessage.senderName || getUserName(incomingChatMessage.senderId)}
+                            </span>
+                            <span className="mt-0.5 block line-clamp-2 text-xs leading-relaxed text-slate-600">
+                              {incomingChatMessage.text?.trim() || (incomingChatMessage.attachmentName
+                                ? `Sent ${incomingChatMessage.attachmentName}`
+                                : 'Sent an attachment')}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDismissIncomingChat?.();
+                              setDismissedChatPreviewId(incomingChatMessage.id);
+                            }}
+                            aria-label="Dismiss chat preview"
+                            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <p className="mt-2 text-[10px] font-bold text-blue-700">Open chat</p>
                       </div>
-                      <p className="mt-2 text-[10px] font-bold text-blue-700">Open chat</p>
-                    </div>
-                  </div>
+                    </div>,
+                    document.body
+                  )
                 )}
               </div>
 

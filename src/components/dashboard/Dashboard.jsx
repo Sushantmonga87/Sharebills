@@ -69,6 +69,8 @@ export default function Dashboard({
   onClearNotifications,
   onTabChange,
   initialTab = 'groups',
+  initialOverlay = null,
+  onOverlayChange,
   mobilePreview = false,
   deferredPromptAvailable = false,
   onInstallApp,
@@ -93,7 +95,7 @@ export default function Dashboard({
   const [overviewLedgerBodyHeight, setOverviewLedgerBodyHeight] = useState(0);
 
   // Activity Drawer / Notification Center Popup State
-  const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const isActivityOpen = initialOverlay === 'activity';
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
   const newMenuRef = useRef(null);
   const [optimisticallyReadNotificationIds, setOptimisticallyReadNotificationIds] = useState(() => new Set());
@@ -440,12 +442,16 @@ export default function Dashboard({
 
   const handleActivityToggle = () => {
     if (isActivityOpen) {
-      setIsActivityOpen(false);
+      onOverlayChange?.(null);
       return;
     }
 
-    setIsActivityOpen(true);
+    onOverlayChange?.('activity');
     markActivityNotificationsRead(unreadNotifications.map((notification) => notification.id));
+  };
+
+  const closeActivity = () => {
+    onOverlayChange?.(null);
   };
 
   const startActivityLongPress = (event, notification) => {
@@ -2148,7 +2154,7 @@ export default function Dashboard({
       {isActivityOpen && (
         <div
           className="fixed inset-0 z-[80] flex justify-end bg-slate-900/30 backdrop-blur-sm transition-opacity"
-          onClick={() => setIsActivityOpen(false)}
+          onClick={closeActivity}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -2202,7 +2208,7 @@ export default function Dashboard({
                 )}
                 <button
                   type="button"
-                  onClick={() => setIsActivityOpen(false)}
+                  onClick={closeActivity}
                   className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
                 >
                   <X size={16} />
@@ -2259,7 +2265,6 @@ export default function Dashboard({
                         }
                         if (n.groupId) {
                           handleOpenGroup(n.groupId, isChat ? 'chat' : 'expenses');
-                          setIsActivityOpen(false);
                         }
                       }}
                       className={`liquid-glass-interactive group relative flex items-start justify-between gap-3 rounded-2xl p-3 cursor-pointer border ${

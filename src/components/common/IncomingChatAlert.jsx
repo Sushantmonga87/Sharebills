@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUpRight, MessageCircle, X } from 'lucide-react';
 
 export default function IncomingChatAlert({ message, sender, group, onOpen, onClose, hidden = false }) {
@@ -13,7 +14,7 @@ export default function IncomingChatAlert({ message, sender, group, onOpen, onCl
 
   if (hidden) return null;
 
-  return (
+  return createPortal(
     <aside
       role="status"
       aria-live="polite"
@@ -53,6 +54,7 @@ export default function IncomingChatAlert({ message, sender, group, onOpen, onCl
           </button>
         </div>
       </div>
-    </aside>
+    </aside>,
+    document.body
   );
 }
