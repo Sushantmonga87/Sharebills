@@ -12,7 +12,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import SpendingBars from './SpendingBars';
@@ -506,17 +505,7 @@ export default function MonthlyAnalyticsTab({
                 ))}
               </div>
             </div>
-            {periodSpending.some((item) => item.total > 0) ? (
-              <SpendingBars data={periodSpending} currency="INR" />
-            ) : (
-              <EmptyState
-                icon={TrendingUp}
-                compact
-                title={`No ${chartRange} spending yet`}
-                description="Add a bill to see your spending trend."
-                className="min-h-40 border-0 bg-transparent"
-              />
-            )}
+            <SpendingBars data={periodSpending} currency="INR" />
           </section>
 
           <section className="order-1 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
@@ -566,13 +555,27 @@ export default function MonthlyAnalyticsTab({
                 </ul>
               </div>
             ) : (
-              <EmptyState
-                icon={PieChart}
-                compact
-                title="No category data yet"
-                description="Your monthly share will appear here."
-                className="min-h-40 border-0 bg-transparent"
-              />
+              <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl bg-slate-50/60 px-4 py-5 text-center sm:flex-row sm:gap-5 sm:text-left">
+                <div
+                  className="relative mb-3 flex h-28 w-28 flex-shrink-0 items-center justify-center rounded-full sm:mb-0"
+                  style={{
+                    background: 'conic-gradient(#203b27 0deg 90deg, #a5e8b3 90deg 180deg, #5a9f58 180deg 270deg, #dbe5dc 270deg 360deg)',
+                  }}
+                  role="img"
+                  aria-label="No category spending data for this month"
+                >
+                  <div className="absolute inset-[19%] flex flex-col items-center justify-center rounded-full bg-white text-center">
+                    <PieChart size={17} className="text-slate-300" />
+                    <span className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">No spend</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-700">No category data yet</p>
+                  <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-slate-500">
+                    Your monthly category breakdown will appear here after you add an expense.
+                  </p>
+                </div>
+              </div>
             )}
           </section>
         </aside>

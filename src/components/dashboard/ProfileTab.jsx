@@ -497,17 +497,29 @@ export default function ProfileTab({
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={Boolean(user?.notificationsPaused)}
-                  aria-label="Pause push notifications"
-                  disabled={savingNotificationPreference}
-                  onClick={handleTogglePausedNotifications}
-                  className={`ios-theme-switch ${savingNotificationPreference ? 'cursor-wait opacity-60' : ''}`}
-                >
-                  <span className="ios-theme-switch__thumb" />
-                </button>
+                <div className="flex flex-shrink-0 items-center gap-3">
+                  {!user?.notificationsPaused && typeof Notification !== 'undefined' && Notification.permission === 'default' && (
+                    <button
+                      type="button"
+                      onClick={handleEnablePush}
+                      disabled={settingUpPush}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-blue-200 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {settingUpPush ? 'Setting up…' : 'Enable'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(user?.notificationsPaused)}
+                    aria-label="Pause push notifications"
+                    disabled={savingNotificationPreference}
+                    onClick={handleTogglePausedNotifications}
+                    className={`ios-theme-switch ${savingNotificationPreference ? 'cursor-wait opacity-60' : ''}`}
+                  >
+                    <span className="ios-theme-switch__thumb" />
+                  </button>
+                </div>
               </div>
               {pushSetupStatus && (
                 <p role="status" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600">
@@ -520,43 +532,6 @@ export default function ProfileTab({
                 onUpdateUser={onUpdateUser}
                 sharedSounds={sharedNotificationSounds}
               />
-
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700">
-                    <Bell size={17} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Push notifications</p>
-                    <p className="text-[11px] text-slate-500">
-                      {user?.notificationsPaused
-                        ? 'Paused in app settings.'
-                        : typeof Notification === 'undefined'
-                        ? 'Notifications are not supported in this browser.'
-                        : Notification.permission === 'granted'
-                          ? 'Allowed on this device.'
-                          : Notification.permission === 'denied'
-                            ? 'Blocked by browser settings.'
-                            : 'Get alerts for activity in your spaces.'}
-                    </p>
-                  </div>
-                </div>
-                {!user?.notificationsPaused && typeof Notification !== 'undefined' && Notification.permission !== 'denied' && (
-                  <button
-                    type="button"
-                    onClick={handleEnablePush}
-                    disabled={settingUpPush}
-                    className="flex-shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-blue-200 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {settingUpPush ? 'Setting up…' : Notification.permission === 'granted' ? 'Refresh setup' : 'Enable'}
-                  </button>
-                )}
-              </div>
-              {pushSetupStatus && (
-                <p role="status" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600">
-                  {pushSetupStatus}
-                </p>
-              )}
 
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
@@ -595,9 +570,13 @@ export default function ProfileTab({
               <AdminSettingsPanel
                 user={user}
                 onUpdateUser={onUpdateUser}
+                className="mt-4"
                 testingPush={testingPush}
                 onTestPush={handleTestPush}
                 testPushStatus={testPushStatus}
+                pushSetupStatus={pushSetupStatus}
+                settingUpPush={settingUpPush}
+                onEnablePush={handleEnablePush}
               />
             )}
           </section>

@@ -4,8 +4,9 @@ import { formatCurrency } from '../../utils/currency';
 export default function SpendingBars({ data, currency = 'INR' }) {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const maximum = Math.max(...data.map((item) => item.total), 0);
+  const hasData = data.some((item) => item.total > 0 || item.share > 0);
   const selectedItem = selectedIndex === null ? null : data[selectedIndex];
-  const axisMaximum = maximum > 0 ? maximum : 1;
+  const axisMaximum = maximum;
 
   return (
     <div>
@@ -73,6 +74,11 @@ export default function SpendingBars({ data, currency = 'INR' }) {
             );
           })}
           </div>
+          {!hasData && (
+            <p className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center text-xs font-medium text-slate-400">
+              No spending data
+            </p>
+          )}
         </div>
       </div>
       <div className="mt-2 grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-2">

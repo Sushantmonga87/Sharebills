@@ -1225,6 +1225,8 @@ export default function Dashboard({
                   onQuickAdd={openQuickExpenseModal}
                   onCopyInvite={handleCopyInvite}
                   copiedCodeId={copiedCodeId}
+                  onCreateGroup={onCreateGroup}
+                  onJoinGroup={onJoinGroup}
                 />
               </div>
             )}
@@ -1550,6 +1552,8 @@ export default function Dashboard({
                       onQuickAdd={openQuickExpenseModal}
                       onCopyInvite={handleCopyInvite}
                       copiedCodeId={copiedCodeId}
+                      onCreateGroup={onCreateGroup}
+                      onJoinGroup={onJoinGroup}
                     />
                   )}
 

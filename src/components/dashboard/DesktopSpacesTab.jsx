@@ -11,6 +11,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
@@ -40,10 +41,14 @@ export default function DesktopSpacesTab({
   onQuickAdd,
   onCopyInvite,
   copiedCodeId,
+  onCreateGroup,
+  onJoinGroup,
 }) {
   return (
-    <section className="w-full rounded-3xl ">
-      <div className="page-heading-bar shared-spaces-heading-bar mb-4 flex items-center justify-between gap-2.5">
+    <section className={`w-full rounded-3xl ${
+      groups.length === 0 ? 'md:flex md:min-h-[calc(100dvh-9rem)] md:flex-col' : ''
+    }`}>
+      <div className="page-heading-bar shared-spaces-heading-bar mb-4 flex flex-wrap items-center justify-between gap-2.5">
         <div className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
             {user?.photoDataUrl ? (
@@ -56,43 +61,67 @@ export default function DesktopSpacesTab({
             Shared Spaces
           </h1>
         </div>
-        <div className={`page-heading-controls hidden items-center gap-1 rounded-full p-1.5 ${mobilePreview ? '' : 'md:flex'}`}>
-          {[
-            { id: 'active', label: `Active (${activeCount})` },
-            { id: 'pinned', label: `Pinned (${pinnedCount})` },
-            { id: 'archived', label: `Archived (${archivedCount})` },
-          ].map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              onClick={() => onSpaceFilterChange(filter.id)}
-              aria-pressed={spaceFilter === filter.id}
-              className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
-                spaceFilter === filter.id
-                  ? 'bg-gradient-to-b from-blue-600 to-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className={`page-heading-controls hidden items-center gap-1 rounded-full p-1.5 ${mobilePreview ? '' : 'md:flex'}`}>
+            {[
+              { id: 'active', label: `Active (${activeCount})` },
+              { id: 'pinned', label: `Pinned (${pinnedCount})` },
+              { id: 'archived', label: `Archived (${archivedCount})` },
+            ].map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => onSpaceFilterChange(filter.id)}
+                aria-pressed={spaceFilter === filter.id}
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
+                  spaceFilter === filter.id
+                    ? 'bg-gradient-to-b from-blue-600 to-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <div className={`hidden items-center gap-2 ${mobilePreview ? '' : 'md:flex'}`}>
+            {onCreateGroup && (
+              <button
+                type="button"
+                onClick={onCreateGroup}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-700 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-800"
+              >
+                <Plus size={14} />
+                Create space
+              </button>
+            )}
+            {onJoinGroup && (
+              <button
+                type="button"
+                onClick={onJoinGroup}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:text-blue-700"
+              >
+                <UserPlus size={14} />
+                Join space
+              </button>
+            )}
+          </div>
+          <label className={`page-heading-controls relative flex h-10 max-w-[58%] flex-shrink items-center gap-2 rounded-full px-3 text-xs font-semibold text-slate-700 ${mobilePreview ? '' : 'md:hidden'}`}>
+            <span className="truncate">
+              {spaceFilter === 'pinned' ? `Pinned (${pinnedCount})` : spaceFilter === 'archived' ? `Archived (${archivedCount})` : `Active (${activeCount})`}
+            </span>
+            <ChevronDown size={14} className="flex-shrink-0 text-slate-400" />
+            <select
+              aria-label="Filter spaces"
+              value={spaceFilter}
+              onChange={(event) => onSpaceFilterChange(event.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             >
-              {filter.label}
-            </button>
-          ))}
+              <option value="active">Active ({activeCount})</option>
+              <option value="pinned">Pinned ({pinnedCount})</option>
+              <option value="archived">Archived ({archivedCount})</option>
+            </select>
+          </label>
         </div>
-        <label className={`page-heading-controls relative flex h-10 max-w-[58%] flex-shrink items-center gap-2 rounded-full px-3 text-xs font-semibold text-slate-700 ${mobilePreview ? '' : 'md:hidden'}`}>
-          <span className="truncate">
-            {spaceFilter === 'pinned' ? `Pinned (${pinnedCount})` : spaceFilter === 'archived' ? `Archived (${archivedCount})` : `Active (${activeCount})`}
-          </span>
-          <ChevronDown size={14} className="flex-shrink-0 text-slate-400" />
-          <select
-            aria-label="Filter spaces"
-            value={spaceFilter}
-            onChange={(event) => onSpaceFilterChange(event.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          >
-            <option value="active">Active ({activeCount})</option>
-            <option value="pinned">Pinned ({pinnedCount})</option>
-            <option value="archived">Archived ({archivedCount})</option>
-          </select>
-        </label>
       </div>
 
       {groups.length === 0 ? (
@@ -112,6 +141,9 @@ export default function DesktopSpacesTab({
                 ? 'Pin an active space to keep it close at hand.'
                 : 'Create a new room or join an existing flat using a 6-digit invite code.'
           }
+          actionLabel={spaceFilter === 'active' ? (onCreateGroup ? 'Create a space' : undefined) : undefined}
+          onAction={spaceFilter === 'active' ? onCreateGroup : undefined}
+          className={groups.length === 0 ? 'md:flex-1' : ''}
         />
       ) : (
         <div className={`grid grid-cols-1 gap-4 ${mobilePreview ? '' : 'md:grid-cols-2'}`}>
