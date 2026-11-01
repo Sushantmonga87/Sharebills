@@ -248,9 +248,9 @@ export default function MonthlyAnalyticsTab({
   };
 
   return (
-    <div className={`mx-auto w-full max-w-[1360px] space-y-5 p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
+    <div className={`mx-auto w-full max-w-[1360px] space-y-5 p-3 pb-20 ${mobilePreview ? '' : 'sm:px-4 sm:pb-20 sm:pt-2 lg:px-6 lg:pb-20 lg:pt-2'}`}>
       {/* Header & Month Switcher */}
-      <div className="flex items-center justify-between gap-2.5">
+      <div className="page-heading-bar flex items-center justify-between gap-2.5">
         <div className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
             {user?.photoDataUrl ? (
@@ -429,7 +429,7 @@ export default function MonthlyAnalyticsTab({
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs lg:mt-auto">
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
         <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Receipt size={16} className="text-blue-700" />

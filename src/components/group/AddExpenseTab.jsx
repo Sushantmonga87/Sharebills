@@ -181,8 +181,8 @@ export default function AddExpenseTab({
       : '0.00';
 
   return (
-    <div className="mx-auto w-full max-w-xl p-4 sm:p-6 pb-20">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="mx-auto w-full max-w-xl p-3 pb-20 sm:px-4 sm:pb-20 sm:pt-2 lg:px-6 lg:pb-20 lg:pt-2">
+      <div className="page-heading-bar mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Record New Bill</h2>
           <p className="text-xs text-slate-500">Split equally or customize member shares</p>
@@ -234,8 +234,8 @@ export default function AddExpenseTab({
             required
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0">
               <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                 <User size={13} />
                 <span>Paid By</span>
@@ -253,7 +253,7 @@ export default function AddExpenseTab({
               </select>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                 <Calendar size={13} />
                 <span>Date</span>
@@ -262,6 +262,7 @@ export default function AddExpenseTab({
                 type="date"
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
+                className="block min-w-0 max-w-full appearance-none px-2.5"
                 required
               />
             </div>

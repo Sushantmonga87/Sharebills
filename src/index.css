@@ -83,6 +83,72 @@ textarea {
     inset 0 1px 1px rgba(255, 255, 255, 0.98);
 }
 
+.page-heading-bar {
+  position: sticky;
+  --page-heading-sticky-offset: 0.75rem;
+  --page-heading-gutter: 0.75rem;
+  top: var(--page-heading-sticky-offset);
+  z-index: 30;
+  background-color: #fff;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  isolation: isolate;
+}
+
+.page-heading-bar::before {
+  position: absolute;
+  z-index: -1;
+  top: calc(0px - var(--page-heading-sticky-offset));
+  right: calc(0px - var(--page-heading-gutter));
+  bottom: -8px;
+  left: calc(0px - var(--page-heading-gutter));
+  background-color: #fff;
+  content: "";
+  pointer-events: none;
+}
+
+.transaction-heading-bar::before,
+.shared-spaces-heading-bar::before {
+  bottom: 0;
+}
+
+@media (min-width: 640px) {
+  .page-heading-bar {
+    --page-heading-sticky-offset: 0.75rem;
+    --page-heading-gutter: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-heading-bar {
+    --page-heading-sticky-offset: 0.75rem;
+    --page-heading-gutter: 1.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-has-mobile-topbar .page-heading-bar {
+    --page-heading-sticky-offset: calc(3.5rem + 0.75rem);
+  }
+}
+
+.transaction-heading-bar {
+  --page-heading-sticky-offset: 0.75rem;
+}
+
+input[type="date"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  text-align: left;
+}
+
 .landing-page {
   scroll-behavior: smooth;
 }
@@ -569,6 +635,10 @@ html.dark .liquid-nav-dock {
   box-shadow:
     0 10px 30px -10px rgba(0, 0, 0, 0.7),
     inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+html.dark .page-heading-bar::before {
+  background-color: #000;
 }
 
 html.dark .liquid-glass-interactive:hover {

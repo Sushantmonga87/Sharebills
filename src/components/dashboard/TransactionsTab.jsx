@@ -93,7 +93,7 @@ export default function TransactionsTab({
   return (
     <section>
       {!preview && (
-        <div className="mb-4 flex items-center justify-between gap-2.5">
+        <div className="page-heading-bar transaction-heading-bar mb-4 flex items-center justify-between gap-2.5">
           <div className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
               {user?.photoDataUrl ? (

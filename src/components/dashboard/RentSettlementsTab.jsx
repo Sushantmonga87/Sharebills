@@ -27,8 +27,8 @@ export default function RentSettlementsTab({
   };
 
   return (
-    <section className={preview ? 'space-y-4' : `mx-auto max-w-[1320px] space-y-5 p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
-      {!preview && <header className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
+    <section className={preview ? 'space-y-4' : `mx-auto max-w-[1320px] space-y-5 p-3 pb-20 ${mobilePreview ? '' : 'sm:px-4 sm:pb-20 sm:pt-2 lg:px-6 lg:pb-20 lg:pt-2'}`}>
+      {!preview && <header className="page-heading-bar page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
           {user?.photoDataUrl ? (
             <img src={user.photoDataUrl} alt="" className="h-full w-full object-cover" />

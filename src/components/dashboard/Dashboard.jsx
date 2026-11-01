@@ -815,7 +815,9 @@ export default function Dashboard({
   };
 
   return (
-    <div ref={dashboardRootRef} className={`relative flex h-full min-h-0 flex-col overflow-hidden bg-white font-sans ${mobilePreview ? '' : 'md:flex-row'}`}>
+    <div ref={dashboardRootRef} className={`relative flex h-full min-h-0 flex-col overflow-hidden bg-white font-sans ${
+      !['profile', 'transactions', 'monthly'].includes(activeTab) ? 'dashboard-has-mobile-topbar' : ''
+    } ${mobilePreview ? '' : 'md:flex-row'}`}>
 
       {/* --- MAIN CONTENT AREA --- */}
       <main className={`relative z-10 min-w-0 flex-1 scrollbar-hide ${mobilePreview ? 'overflow-hidden pb-0' : 'overscroll-y-contain overflow-y-auto pb-24 md:order-2 md:pb-8'}`}>
@@ -825,7 +827,7 @@ export default function Dashboard({
             mobilePreview ? '' : 'md:hidden'
           } ${
             ['profile', 'transactions', 'monthly'].includes(activeTab) ? 'hidden' : ''
-          }`}
+          } sticky top-0 bg-white/90 backdrop-blur-md`}
         >
           <button
             type="button"
@@ -888,11 +890,9 @@ export default function Dashboard({
 
         {(activeTab === 'groups' || activeTab === 'spaces' || activeTab === 'transactions') && (
           <div
-            className={`mx-auto max-w-[1360px] ${mobilePreview ? 'p-3.5' : 'p-3.5 sm:p-5 md:px-6 md:pb-6 lg:px-8 lg:pb-8'} ${
-              activeTab === 'spaces' || activeTab === 'transactions'
-                ? mobilePreview ? '' : 'md:pt-0 lg:pt-0'
-                : mobilePreview ? '' : 'md:pt-6 lg:pt-8'
-            }`}
+            className={`mx-auto max-w-[1360px] ${mobilePreview ? 'p-3' : `p-3 sm:px-4 sm:pb-5 sm:pt-2 md:px-5 md:pb-5 md:pt-2 lg:px-6 lg:pb-6 lg:pt-2 ${
+              activeTab === 'spaces' || activeTab === 'transactions' ? 'md:pt-0 lg:pt-0' : ''
+            }`}`}
           >
             {/* ===================================================================== */}
             {/* NATIVE MOBILE APP DASHBOARD (< md)                                    */}
@@ -1232,10 +1232,12 @@ export default function Dashboard({
             {/* ===================================================================== */}
             {/* DESKTOP LIQUID GLASS COMMAND CENTER (md+)                             */}
             {/* ===================================================================== */}
-            <div className={mobilePreview ? 'hidden space-y-6' : 'hidden md:block space-y-6'}>
+            <div className={`hidden ${mobilePreview ? '' : 'md:block'} ${
+              activeTab === 'groups' ? 'space-y-6' : ''
+            }`}>
               {/* 1. Desktop Top Command Bar with Activity on Top Right */}
               <div
-                className={`liquid-glass relative flex flex-col gap-3 rounded-3xl p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:px-5 ${
+                className={`page-heading-bar liquid-glass relative flex flex-col gap-3 rounded-3xl p-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:px-5 ${
                   isNewMenuOpen ? 'z-[60]' : 'z-10'
                 } ${
                   activeTab === 'groups' ? '' : 'hidden'
@@ -1514,7 +1516,7 @@ export default function Dashboard({
 
               {/* 3. Main 12-Column Desktop Bento Grid */}
               <div className={`grid grid-cols-12 items-stretch gap-6 ${
-                activeTab === 'groups' && !mobilePreview ? 'xl:h-[min(70vh,720px)]' : ''
+                activeTab === 'groups' && !mobilePreview ? 'xl:min-h-[min(80vh,860px)]' : ''
               }`}>
                 {/* LEFT 8 COLUMNS: Recent Ledger (and Spaces Tab on Desktop) */}
                 <div
@@ -1564,7 +1566,7 @@ export default function Dashboard({
                     }`}
                   >
                     {activeTab !== 'transactions' && <>
-                    <div className={`mb-4 flex flex-wrap items-center justify-between gap-2.5 ${
+                    <div className={`page-heading-bar mb-4 flex flex-wrap items-center justify-between gap-2.5 ${
                       activeTab === 'transactions' ? '' : 'border-b border-slate-200/60 pb-3.5'
                     }`}>
                       {activeTab === 'transactions' ? (
@@ -1898,10 +1900,6 @@ export default function Dashboard({
                 <div
                   className={`col-span-12 flex flex-col space-y-6 xl:col-span-4 ${
                     activeTab === 'groups' ? '' : 'hidden'
-                  } ${
-                    activeTab === 'groups' && !mobilePreview
-                      ? 'xl:h-full xl:min-h-0'
-                      : ''
                   }`}
                 >
                   <section className="liquid-glass flex-shrink-0 rounded-3xl p-5">
@@ -1987,7 +1985,9 @@ export default function Dashboard({
                   </section>
 
                   {/* PINNED SPACES WIDGET (Desktop Right Column) */}
-                  <section className="liquid-glass flex min-w-0 flex-col overflow-hidden rounded-3xl p-5 xl:min-h-0 xl:flex-1">
+                  <section className={`liquid-glass flex min-w-0 flex-col overflow-hidden rounded-3xl p-5 ${
+                    pinnedGroups.length > 1 ? 'xl:min-h-[18rem] xl:flex-1' : 'xl:flex-none'
+                  }`}>
                     <div className="mb-3.5 flex items-center justify-between border-b border-slate-200/60 pb-3">
                       <div>
                         <h3 className="text-sm font-extrabold text-slate-900">
@@ -2111,7 +2111,7 @@ export default function Dashboard({
         {activeTab !== 'groups' &&
           activeTab !== 'spaces' &&
           activeTab !== 'transactions' && (
-            <div className="h-full">
+            <div className="min-h-full">
               {activeTab === 'monthly' && (
                 <MonthlyAnalyticsTab
                   user={user}

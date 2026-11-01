@@ -55,7 +55,7 @@ export default function ActivityTab({
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8 pb-20">
+    <div className="mx-auto w-full max-w-4xl p-3 pb-20 sm:px-4 sm:pb-20 sm:pt-2 lg:px-6 lg:pb-20 lg:pt-2">
       <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200/90 pb-4">
         <div>
           <p className="text-xs font-medium text-slate-500">Updates & Ledger Alerts</p>

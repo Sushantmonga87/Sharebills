@@ -31,7 +31,7 @@ import {
 import { auth } from '../../firebase';
 import { Button, Input } from '../common/UI';
 import { requestNotificationPermission, triggerPushNotification } from '../../utils/notifications';
-import NotificationSoundPublisher from './NotificationSoundPublisher';
+import AdminSettingsPanel from './AdminSettingsPanel';
 import NotificationSoundSettings from './NotificationSoundSettings';
 import ProfileSettingsPanel from './ProfileSettingsPanel';
 
@@ -357,8 +357,8 @@ export default function ProfileTab({
   const getInitials = () => (user?.username || 'U').charAt(0).toUpperCase();
 
   return (
-    <div className={`mx-auto w-full max-w-[1360px] p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
-      <div className="mb-5 flex items-center justify-between gap-2.5">
+    <div className={`mx-auto w-full max-w-[1360px] p-3 pb-20 ${mobilePreview ? '' : 'sm:px-4 sm:pb-20 sm:pt-2 lg:px-6 lg:pb-20 lg:pt-2'}`}>
+      <div className="page-heading-bar mb-5 flex items-center justify-between gap-2.5">
         <div className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
             {photoDataUrl ? (
@@ -520,7 +520,6 @@ export default function ProfileTab({
                 onUpdateUser={onUpdateUser}
                 sharedSounds={sharedNotificationSounds}
               />
-              <NotificationSoundPublisher user={user} onUpdateUser={onUpdateUser} />
 
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
@@ -593,38 +592,13 @@ export default function ProfileTab({
             </div>
 
             {canViewPushDiagnostics && (
-              <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700">
-                      <Bell size={17} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">Push notification diagnostics</p>
-                      <p className="text-[11px] text-slate-500">Verify delivery and device permissions.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleTestPush}
-                    disabled={testingPush}
-                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {testingPush ? 'Testing…' : 'Test push'}
-                  </button>
-                </div>
-                {testPushStatus && (
-                  <p className={`rounded-lg border p-2.5 font-mono text-xs break-all ${
-                    testPushStatus.startsWith('Success')
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : testPushStatus.startsWith('Error') || testPushStatus.startsWith('Trigger Error')
-                        ? 'border-rose-200 bg-rose-50 text-rose-700'
-                        : 'bg-slate-100 text-slate-700'
-                  }`}>
-                    {testPushStatus}
-                  </p>
-                )}
-              </div>
+              <AdminSettingsPanel
+                user={user}
+                onUpdateUser={onUpdateUser}
+                testingPush={testingPush}
+                onTestPush={handleTestPush}
+                testPushStatus={testPushStatus}
+              />
             )}
           </section>
         </div>
