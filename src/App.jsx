@@ -351,6 +351,8 @@ export default function App() {
   const currentRouteRef = useRef(initialRoute);
   const authModeRef = useRef(null);
   const navigateToRef = useRef(null);
+  const backActionRef = useRef(new Map());
+  const backActionIdRef = useRef(0);
   const lastExitedGroupIdRef = useRef(null);
   const notificationSoundSettingsRef = useRef(null);
   const lastNotificationSoundRef = useRef({ groupId: null, timestamp: 0 });
@@ -566,6 +568,20 @@ export default function App() {
     window.history.back();
   };
 
+  const registerBackAction = useCallback((action) => {
+    if (typeof action !== 'function') return () => {};
+    const actionId = ++backActionIdRef.current;
+    backActionRef.current.set(actionId, action);
+    return () => backActionRef.current.delete(actionId);
+  }, []);
+  const runBackAction = () => {
+    const actions = [...backActionRef.current.values()];
+    for (let index = actions.length - 1; index >= 0; index -= 1) {
+      if (actions[index]()) return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
     if (window.location.pathname === '/admin') return undefined;
 
@@ -577,6 +593,12 @@ export default function App() {
     }
 
     const handlePopState = (event) => {
+      if (runBackAction()) {
+        const route = currentRouteRef.current;
+        window.history.pushState({ roomSplitRoute: route }, '', getRouteUrl(route));
+        return;
+      }
+
       if (event.state?.roomSplitAuth) {
         authModeRef.current = event.state.roomSplitAuth;
         setAuthMode(event.state.roomSplitAuth);
@@ -590,14 +612,13 @@ export default function App() {
 
       const previousRoute = currentRouteRef.current;
       const destinationRoute = event.state?.roomSplitRoute;
-      if (previousRoute.view === 'group' && (!destinationRoute || destinationRoute.view === 'dashboard')) {
-        lastExitedGroupIdRef.current = previousRoute.groupId;
-      }
-      if (
-        (!destinationRoute || destinationRoute.view === 'dashboard')
-        && previousRoute.view === 'group'
+      const destinationIsCurrentGroupExpenses = destinationRoute?.view === 'group'
+        && destinationRoute.initialTab === 'expenses'
+        && !destinationRoute.drawerOpen
+        && getRouteUrl(destinationRoute) === getRouteUrl(previousRoute);
+      if (previousRoute.view === 'group'
         && (previousRoute.initialTab !== 'expenses' || previousRoute.drawerOpen)
-      ) {
+        && !destinationIsCurrentGroupExpenses) {
         const expensesRoute = {
           ...previousRoute,
           initialTab: 'expenses',
@@ -605,6 +626,24 @@ export default function App() {
         };
         window.history.pushState({ roomSplitRoute: expensesRoute }, '', getRouteUrl(expensesRoute));
         applyRoute(expensesRoute);
+        return;
+      }
+
+      if (previousRoute.view === 'dashboard' && previousRoute.dashboardTab !== 'groups') {
+        const overviewRoute = { view: 'dashboard', dashboardTab: 'groups' };
+        window.history.replaceState({ roomSplitRoute: overviewRoute }, '', getRouteUrl(overviewRoute));
+        applyRoute(overviewRoute);
+        return;
+      }
+
+      if (previousRoute.view === 'group'
+        && previousRoute.initialTab === 'expenses'
+        && !previousRoute.drawerOpen
+        && (!destinationRoute || destinationRoute.view === 'dashboard')) {
+        lastExitedGroupIdRef.current = previousRoute.groupId;
+        const overviewRoute = { view: 'dashboard', dashboardTab: 'groups' };
+        window.history.replaceState({ roomSplitRoute: overviewRoute }, '', getRouteUrl(overviewRoute));
+        applyRoute(overviewRoute);
         return;
       }
 
@@ -628,6 +667,7 @@ export default function App() {
     let listener;
     let isCancelled = false;
     CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (runBackAction()) return;
       if (canGoBack || window.history.state?.roomSplitRoute || window.history.state?.roomSplitSentinel) {
         window.history.back();
       } else {
@@ -1902,6 +1942,7 @@ export default function App() {
           users={users}
           initialTab={dashboardTab}
           initialOverlay={dashboardOverlay}
+          onBackActionChange={registerBackAction}
           onOverlayChange={(overlay) => {
             const route = currentRouteRef.current;
             if (overlay) {
@@ -1965,6 +2006,7 @@ export default function App() {
             key={activeGroup.id}
             group={activeGroup}
             initialTab={currentGroupInitialTab}
+            onBackActionChange={registerBackAction}
             expenseDraft={currentGroupExpenseDraft}
             initialDrawerOpen={currentGroupDrawerOpen}
             onGroupTabChange={(tab, { replace = false } = {}) => {

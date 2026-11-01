@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   CheckCircle2,
@@ -22,6 +22,7 @@ import { triggerPushNotification } from '../../utils/notifications';
 import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
 
 export default function BalancesTab({
+  onBackActionChange,
   expenses,
   group,
   currentUser,
@@ -45,6 +46,21 @@ export default function BalancesTab({
   const [loading, setLoading] = useState(false);
   const [showOptimized, setShowOptimized] = useState(true);
   const confirmationInFlight = useRef(false);
+
+  useEffect(() => {
+    if (!onBackActionChange) return undefined;
+    return onBackActionChange(() => {
+      if (confirmSettlement) {
+        setConfirmSettlement(null);
+        return true;
+      }
+      if (breakdownData) {
+        setBreakdownData(null);
+        return true;
+      }
+      return false;
+    });
+  }, [breakdownData, confirmSettlement, onBackActionChange]);
 
   const [customPayee, setCustomPayee] = useState('');
   const [customAmount, setCustomAmount] = useState('');

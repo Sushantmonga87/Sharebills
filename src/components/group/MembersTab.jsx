@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
@@ -37,6 +37,7 @@ export default function MembersTab({
   onDeleteGroup,
   onUpdateGroup,
   onLeaveGroup,
+  onBackActionChange,
   showToast,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -51,6 +52,29 @@ export default function MembersTab({
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
+
+  useEffect(() => {
+    if (!onBackActionChange) return undefined;
+    return onBackActionChange(() => {
+      if (showQrModal) {
+        setShowQrModal(false);
+        return true;
+      }
+      if (isInviteOpen) {
+        setIsInviteOpen(false);
+        return true;
+      }
+      if (confirmingLeave) {
+        setConfirmingLeave(false);
+        return true;
+      }
+      if (confirmingDelete) {
+        setConfirmingDelete(false);
+        return true;
+      }
+      return false;
+    });
+  }, [confirmingDelete, confirmingLeave, isInviteOpen, onBackActionChange, showQrModal]);
 
   const inviteUrl = `${window.location.origin}/?join=${encodeURIComponent(group.inviteCode)}`;
 

@@ -71,6 +71,7 @@ export default function Dashboard({
   initialTab = 'groups',
   initialOverlay = null,
   onOverlayChange,
+  onBackActionChange,
   mobilePreview = false,
   deferredPromptAvailable = false,
   onInstallApp,
@@ -453,6 +454,48 @@ export default function Dashboard({
   const closeActivity = () => {
     onOverlayChange?.(null);
   };
+
+  useEffect(() => {
+    if (!onBackActionChange) return undefined;
+    return onBackActionChange(() => {
+      if (activityContextNotification) {
+        setActivityContextNotification(null);
+        activityLongPressRef.current = false;
+        return true;
+      }
+      if (activityDeleteIds) {
+        setActivityDeleteIds(null);
+        return true;
+      }
+      if (showLogoutConfirmation && !isSigningOut) {
+        setShowLogoutConfirmation(false);
+        return true;
+      }
+      if (quickExpenseOpen && !savingQuick) {
+        setQuickExpenseOpen(false);
+        return true;
+      }
+      if (installDialogOpen) {
+        setInstallDialogOpen(false);
+        return true;
+      }
+      if (isNewMenuOpen) {
+        setIsNewMenuOpen(false);
+        return true;
+      }
+      return false;
+    });
+  }, [
+    activityContextNotification,
+    activityDeleteIds,
+    installDialogOpen,
+    isNewMenuOpen,
+    isSigningOut,
+    onBackActionChange,
+    quickExpenseOpen,
+    savingQuick,
+    showLogoutConfirmation,
+  ]);
 
   const startActivityLongPress = (event, notification) => {
     if (event.type === 'mousedown' && event.button !== 0) return;

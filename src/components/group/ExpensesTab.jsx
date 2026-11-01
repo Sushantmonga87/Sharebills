@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Receipt,
@@ -178,6 +178,7 @@ function SplitPillGroup({ participants, visibleLimit, showAll }) {
 
 export default function ExpensesTab({
   expenses,
+  onBackActionChange,
   currency = 'INR',
   currentUser,
   users = [],
@@ -193,6 +194,21 @@ export default function ExpensesTab({
   const [selectedIds, setSelectedIds] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [detailExpense, setDetailExpense] = useState(null);
+
+  useEffect(() => {
+    if (!onBackActionChange) return undefined;
+    return onBackActionChange(() => {
+      if (showConfirmModal) {
+        setShowConfirmModal(false);
+        return true;
+      }
+      if (detailExpense) {
+        setDetailExpense(null);
+        return true;
+      }
+      return false;
+    });
+  }, [detailExpense, onBackActionChange, showConfirmModal]);
 
   const uniquePayers = Array.from(new Set(expenses.map((e) => e.paidBy).filter(Boolean)));
   const totalGroupMembers = new Set([...users.map(u => u.id), currentUser.id]).size;

@@ -240,6 +240,7 @@ function LinkPreview({ url, isMe }) {
 }
 
 export default function ChatTab({
+  onBackActionChange,
   group,
   groups = [],
   currentUser,
@@ -279,6 +280,55 @@ export default function ChatTab({
   const [resolvingDisputeIds, setResolvingDisputeIds] = useState(new Set());
   const [disputeResolutionMessage, setDisputeResolutionMessage] = useState(null);
   const [disputeResolutionMode, setDisputeResolutionMode] = useState('choices');
+  useEffect(() => {
+    if (!onBackActionChange) return undefined;
+    return onBackActionChange(() => {
+      if (selectedImage) {
+        setSelectedImage(null);
+        return true;
+      }
+      if (deleteDialogMessages) {
+        setDeleteDialogMessages(null);
+        return true;
+      }
+      if (shareDialogMessages && !sharingGroupId) {
+        setShareDialogMessages(null);
+        return true;
+      }
+      if (showClearConfirm) {
+        setShowClearConfirm(false);
+        return true;
+      }
+      if (disputeResolutionMessage) {
+        if (disputeResolutionMode !== 'choices') {
+          setDisputeResolutionMode('choices');
+        } else {
+          setDisputeResolutionMessage(null);
+        }
+        return true;
+      }
+      if (activeContextMenu) {
+        setActiveContextMenu(null);
+        return true;
+      }
+      if (pickerTab) {
+        setPickerTab(null);
+        return true;
+      }
+      return false;
+    });
+  }, [
+    activeContextMenu,
+    deleteDialogMessages,
+    disputeResolutionMessage,
+    disputeResolutionMode,
+    onBackActionChange,
+    pickerTab,
+    selectedImage,
+    shareDialogMessages,
+    sharingGroupId,
+    showClearConfirm,
+  ]);
   const [disputeEditForm, setDisputeEditForm] = useState(null);
   const [disputeResolutionError, setDisputeResolutionError] = useState('');
 

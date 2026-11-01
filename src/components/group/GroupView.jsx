@@ -28,6 +28,7 @@ export default function GroupView({
   initialTab = 'expenses',
   expenseDraft = null,
   onGroupTabChange,
+  onBackActionChange,
   onActiveChatChange,
   unreadChatCount = 0,
   incomingChatMessage = null,
@@ -111,6 +112,15 @@ export default function GroupView({
     );
     return () => window.clearTimeout(timeout);
   }, [incomingChatMessage, group.id]);
+
+  useEffect(() => {
+    if (!onBackActionChange) return undefined;
+    return onBackActionChange(() => {
+      if (!rentPopupOpen) return false;
+      setRentPopupOpen(false);
+      return true;
+    });
+  }, [onBackActionChange, rentPopupOpen]);
 
   const handleTabSelect = (tab) => {
     onGroupTabChange?.(tab);
@@ -304,6 +314,7 @@ export default function GroupView({
                 <div className="col-span-12 xl:col-span-8">
                   <ExpensesTab
                     expenses={sortedExpenses}
+                    onBackActionChange={onBackActionChange}
                     currency={group.currency}
                     currentUser={currentUser}
                     users={users}
@@ -454,6 +465,7 @@ export default function GroupView({
           {activeTab === 'balances' && (
             <BalancesTab
               expenses={expenses}
+              onBackActionChange={onBackActionChange}
               group={group}
               currentUser={currentUser}
               getUserName={getUserName}
@@ -471,6 +483,7 @@ export default function GroupView({
               currentUser={currentUser}
               users={users}
               expenses={expenses}
+              onBackActionChange={onBackActionChange}
               onSendNotification={onSendNotification}
               onResolveExpenseDispute={onResolveExpenseDispute}
               showToast={showToast}
@@ -490,6 +503,7 @@ export default function GroupView({
               onUpdateGroup={onUpdateGroup}
               onDeleteGroup={onDeleteGroup}
               onLeaveGroup={onLeaveGroup}
+              onBackActionChange={onBackActionChange}
               showToast={showToast}
             />
           )}
