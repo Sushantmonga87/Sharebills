@@ -5,55 +5,38 @@ import {
   ArrowDownLeft,
   PieChart,
   Receipt,
-  Utensils,
-  Car,
   Home,
-  ShoppingBag,
-  Zap,
-  HelpCircle,
   Check,
   CircleDollarSign,
   X,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  TrendingUp,
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
+import SpendingBars from './SpendingBars';
+import EmptyState from '../common/EmptyState';
 
-const CATEGORY_META = {
-  Food: {
-    color: 'bg-amber-500',
-    softBg: 'bg-amber-50 border-amber-200/80 text-amber-700',
-    icon: <Utensils size={14} />,
-  },
-  Travel: {
-    color: 'bg-sky-500',
-    softBg: 'bg-sky-50 border-sky-200/80 text-sky-700',
-    icon: <Car size={14} />,
-  },
-  Rent: {
-    color: 'bg-slate-800',
-    softBg: 'bg-slate-100 border-slate-200 text-slate-700',
-    icon: <Home size={14} />,
-  },
-  Utilities: {
-    color: 'bg-blue-500',
-    softBg: 'bg-blue-50 border-blue-200/80 text-blue-700',
-    icon: <Zap size={14} />,
-  },
-  Shopping: {
-    color: 'bg-emerald-600',
-    softBg: 'bg-emerald-50 border-emerald-200/80 text-emerald-700',
-    icon: <ShoppingBag size={14} />,
-  },
-  Other: {
-    color: 'bg-slate-400',
-    softBg: 'bg-slate-50 border-slate-200 text-slate-600',
-    icon: <HelpCircle size={14} />,
-  },
+const CATEGORY_CHART_COLORS = {
+  Food: '#f59e0b',
+  Travel: '#0ea5e9',
+  Rent: '#1e293b',
+  Utilities: '#3b82f6',
+  Shopping: '#059669',
+  Other: '#94a3b8',
 };
 
-const getCategoryMeta = (name = 'Other') => CATEGORY_META[name] || CATEGORY_META.Other;
+const getExpenseDate = (expense) => {
+  const value = expense.date || expense.createdAt;
+  if (value?.toDate) return value.toDate();
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [dateYear, dateMonth, dateDay] = value.split('-').map(Number);
+    return new Date(dateYear, dateMonth - 1, dateDay);
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 export default function MonthlyAnalyticsTab({
   user,
@@ -64,6 +47,7 @@ export default function MonthlyAnalyticsTab({
 }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedBreakdown, setSelectedBreakdown] = useState(null);
+  const [chartRange, setChartRange] = useState('daily');
   const monthPickerInputRef = useRef(null);
 
   const year = currentDate.getFullYear();
@@ -90,8 +74,10 @@ export default function MonthlyAnalyticsTab({
   };
 
   const monthlyExpenses = useMemo(() => {
-    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    return expenses.filter((exp) => exp.date && exp.date.startsWith(monthPrefix));
+    return expenses.filter((expense) => {
+      const date = getExpenseDate(expense);
+      return date && date.getFullYear() === year && date.getMonth() === month;
+    });
   }, [expenses, year, month]);
 
   const spendingExpenses = useMemo(
@@ -101,6 +87,81 @@ export default function MonthlyAnalyticsTab({
       ),
     [monthlyExpenses]
   );
+
+  const datedSpendingExpenses = useMemo(
+    () => expenses
+      .filter((expense) => !expense.isSettlement && expense.category !== 'Settlement')
+      .map((expense) => ({ expense, date: getExpenseDate(expense) }))
+      .filter((item) => item.date),
+    [expenses]
+  );
+
+  const periodSpending = useMemo(() => {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    const lastDay = year === today.getFullYear() && month === today.getMonth()
+      ? today.getDate()
+      : daysInMonth;
+    const monthItems = datedSpendingExpenses.filter(
+      ({ date }) => date.getFullYear() === year && date.getMonth() === month
+    );
+
+    if (chartRange === 'monthly') {
+      return [{
+        label: currentDate.toLocaleDateString('en-US', { month: 'short' }),
+        detail: formattedMonthLabel,
+        total: monthItems.reduce(
+          (sum, { expense }) => sum + (Number.parseFloat(expense.totalAmount) || 0),
+          0
+        ),
+        share: monthItems.reduce(
+          (sum, { expense }) => sum + (Number.parseFloat(expense.splits?.[userId]) || 0),
+          0
+        ),
+      }];
+    }
+
+    if (chartRange === 'weekly') {
+      const weekCount = Math.ceil(daysInMonth / 7);
+      return Array.from({ length: weekCount }, (_, index) => {
+        const startDay = index * 7 + 1;
+        const endDay = Math.min(startDay + 6, daysInMonth);
+        const weekItems = monthItems.filter(
+          ({ date }) => date.getDate() >= startDay && date.getDate() <= endDay
+        );
+        return {
+          label: `W${index + 1}`,
+          detail: `${formattedMonthLabel}, week ${index + 1} (${startDay} to ${endDay})`,
+          total: weekItems.reduce(
+            (sum, { expense }) => sum + (Number.parseFloat(expense.totalAmount) || 0),
+            0
+          ),
+          share: weekItems.reduce(
+            (sum, { expense }) => sum + (Number.parseFloat(expense.splits?.[userId]) || 0),
+            0
+          ),
+        };
+      });
+    }
+
+    const startDay = Math.max(1, lastDay - 6);
+    return Array.from({ length: lastDay - startDay + 1 }, (_, index) => {
+      const day = startDay + index;
+      const dayItems = monthItems.filter(({ date }) => date.getDate() === day);
+      return {
+        label: new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'short' }),
+        detail: `${formattedMonthLabel} ${day}`,
+        total: dayItems.reduce(
+          (sum, { expense }) => sum + (Number.parseFloat(expense.totalAmount) || 0),
+          0
+        ),
+        share: dayItems.reduce(
+          (sum, { expense }) => sum + (Number.parseFloat(expense.splits?.[userId]) || 0),
+          0
+        ),
+      };
+    });
+  }, [chartRange, currentDate, datedSpendingExpenses, formattedMonthLabel, month, userId, year]);
 
   const monthlyRents = useMemo(() => {
     const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -170,13 +231,24 @@ export default function MonthlyAnalyticsTab({
     0
   );
   const netBalance = stats.youPaidTotal - stats.yourShareTotal;
+  const largestExpense = spendingExpenses.reduce(
+    (largest, expense) => (
+      Number.parseFloat(expense.totalAmount) > Number.parseFloat(largest?.totalAmount || 0)
+        ? expense
+        : largest
+    ),
+    null
+  );
+  const averageExpense = spendingExpenses.length
+    ? stats.totalGroupSpent / spendingExpenses.length
+    : 0;
 
   const openBreakdown = (type, title, category) => {
     setSelectedBreakdown({ type, title, category });
   };
 
   return (
-    <div className={`mx-auto max-w-5xl space-y-5 p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
+    <div className={`mx-auto w-full max-w-[1360px] space-y-5 p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
       {/* Header & Month Switcher */}
       <div className="flex items-center justify-between gap-2.5">
         <div className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
@@ -307,6 +379,8 @@ export default function MonthlyAnalyticsTab({
         </div>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-stretch">
+        <div className="flex flex-col gap-4">
       <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
         <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
@@ -316,9 +390,13 @@ export default function MonthlyAnalyticsTab({
           <span className="text-xs font-medium text-slate-500">Tracked separately</span>
         </div>
         {monthlyRents.length === 0 ? (
-          <p className="py-4 text-center text-xs text-slate-500">
-            No rent records for {formattedMonthLabel}.
-          </p>
+          <EmptyState
+            icon={Home}
+            compact
+            title="No rent records"
+            description={`Nothing tracked for ${formattedMonthLabel}.`}
+            className="border-0 bg-transparent"
+          />
         ) : (
           <div className="divide-y divide-slate-100">
             {monthlyRents.map((rent) => {
@@ -351,63 +429,153 @@ export default function MonthlyAnalyticsTab({
         )}
       </section>
 
-      {/* Category Breakdown */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs lg:mt-auto">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <PieChart size={16} className="text-slate-700" />
-            <h2 className="text-sm font-bold text-slate-900">Spending by Category</h2>
+            <Receipt size={16} className="text-blue-700" />
+            <h2 className="text-sm font-bold text-slate-900">Expense snapshot</h2>
           </div>
           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
             {spendingExpenses.length} bill{spendingExpenses.length === 1 ? '' : 's'}
           </span>
         </div>
-
-        {stats.categoryList.length === 0 ? (
-          <div className="py-10 text-center">
-            <Receipt size={24} className="mx-auto mb-2 text-slate-400" />
-            <p className="text-sm font-semibold text-slate-700">No expenses logged</p>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Nothing recorded for {formattedMonthLabel}
-            </p>
+        {spendingExpenses.length > 0 ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-xl bg-blue-50/70 px-3.5 py-3">
+              <span className="text-xs font-medium text-slate-600">Average bill</span>
+              <span className="font-mono text-sm font-bold text-slate-900">
+                {formatCurrency(averageExpense, 'INR')}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/70 px-3.5 py-3">
+              <span className="min-w-0 text-xs font-medium text-slate-600">Largest bill</span>
+              <span className="min-w-0 text-right">
+                <span className="block max-w-[190px] truncate text-[11px] font-semibold text-slate-700">
+                  {largestExpense?.title || largestExpense?.description || 'Shared expense'}
+                </span>
+                <span className="font-mono text-sm font-bold text-slate-900">
+                  {formatCurrency(Number.parseFloat(largestExpense?.totalAmount) || 0, 'INR')}
+                </span>
+              </span>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {stats.categoryList.map((cat) => {
-              const meta = getCategoryMeta(cat.name);
-              return (
-                <button
-                  key={cat.name}
-                  type="button"
-                  onClick={() => openBreakdown('category', `${cat.name} Spending`, cat.name)}
-                  className="w-full rounded-xl border border-transparent p-2.5 text-left transition-colors hover:border-slate-200 hover:bg-slate-50"
-                  aria-label={`View ${cat.name} expenses, totaling ₹${cat.total.toFixed(2)}`}
-                >
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-lg border ${meta.softBg}`}
-                      >
-                        {meta.icon}
-                      </span>
-                      <span className="font-semibold text-slate-900">{cat.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 font-mono">
-                      <span className="text-[11px] text-slate-400">{cat.percentage}%</span>
-                      <span className="font-bold text-slate-900">₹{cat.total.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full ${meta.color}`}
-                      style={{ width: `${cat.percentage}%` }}
-                    />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <EmptyState
+            icon={Receipt}
+            compact
+            title="No bills to summarize"
+            description={`Your expense insights for ${formattedMonthLabel} will appear here.`}
+            className="border-0 bg-transparent"
+          />
         )}
+      </section>
+        </div>
+
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-stretch">
+          <section className="order-2 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs lg:mt-auto">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  {chartRange === 'daily'
+                    ? 'Daily spending'
+                    : chartRange === 'weekly'
+                      ? 'Weekly spending'
+                      : 'Monthly spending'}
+                </h2>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {chartRange === 'daily'
+                    ? 'Daily totals in'
+                    : chartRange === 'weekly'
+                      ? 'Spending by week in'
+                      : 'Total group spend and your share for'} {formattedMonthLabel}
+                </p>
+              </div>
+              <div className="flex rounded-lg bg-slate-100 p-0.5" role="group" aria-label="Spending chart period">
+                {['daily', 'weekly', 'monthly'].map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    aria-pressed={chartRange === range}
+                    onClick={() => setChartRange(range)}
+                    className={`rounded-md px-2.5 py-1.5 text-[10px] font-semibold capitalize transition-colors ${
+                      chartRange === range ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {periodSpending.some((item) => item.total > 0) ? (
+              <SpendingBars data={periodSpending} currency="INR" />
+            ) : (
+              <EmptyState
+                icon={TrendingUp}
+                compact
+                title={`No ${chartRange} spending yet`}
+                description="Add a bill to see your spending trend."
+                className="min-h-40 border-0 bg-transparent"
+              />
+            )}
+          </section>
+
+          <section className="order-1 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+            <div className="mb-4">
+              <div className="flex items-center gap-2">
+                <PieChart size={16} className="text-slate-700" />
+                <h2 className="text-sm font-bold text-slate-900">Monthly category mix</h2>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">Your share by category · {formattedMonthLabel}</p>
+            </div>
+            {stats.categoryList.length ? (
+              <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-center">
+                <div
+                  className="chart-donut-rotate relative h-40 w-40 flex-shrink-0 rounded-full"
+                  style={{
+                    background: `conic-gradient(${(() => {
+                      let start = 0;
+                      return stats.categoryList.map((category) => {
+                        const end = start + Number(category.percentage);
+                        const segment = `${CATEGORY_CHART_COLORS[category.name] || CATEGORY_CHART_COLORS.Other} ${start}% ${end}%`;
+                        start = end;
+                        return segment;
+                      }).join(', ') || '#e2e8f0 0% 100%';
+                    })()})`,
+                  }}
+                  role="img"
+                  aria-label={`Category breakdown totaling ${formatCurrency(stats.yourShareTotal)}: ${stats.categoryList.map((category) => `${category.name} ${category.percentage}%`).join(', ')}`}
+                >
+                  <div className="absolute inset-[18%] flex flex-col items-center justify-center rounded-full bg-white text-center">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Your share</span>
+                    <span className="mt-0.5 max-w-full truncate px-1 font-mono text-sm font-bold text-slate-900">
+                      {formatCurrency(stats.yourShareTotal, 'INR', 0)}
+                    </span>
+                  </div>
+                </div>
+                <ul className="grid w-full grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-1">
+                  {stats.categoryList.map((category) => (
+                    <li key={category.name} className="flex min-w-0 items-center gap-2 text-[11px]">
+                      <span
+                        className="h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+                        style={{ backgroundColor: CATEGORY_CHART_COLORS[category.name] || CATEGORY_CHART_COLORS.Other }}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-slate-600">{category.name}</span>
+                      <span className="font-semibold text-slate-800">{category.percentage}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <EmptyState
+                icon={PieChart}
+                compact
+                title="No category data yet"
+                description="Your monthly share will appear here."
+                className="min-h-40 border-0 bg-transparent"
+              />
+            )}
+          </section>
+        </aside>
       </div>
 
       {selectedBreakdown &&

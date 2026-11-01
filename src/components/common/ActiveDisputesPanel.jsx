@@ -30,9 +30,8 @@ export default function ActiveDisputesPanel({
     didSwipe.current = false;
   };
 
-  const handleTouchEnd = (event) => {
+  const handleSwipeEnd = (touch) => {
     const start = touchStart.current;
-    const touch = event.changedTouches[0];
     touchStart.current = null;
     if (!start || !touch) return;
 
@@ -48,6 +47,13 @@ export default function ActiveDisputesPanel({
     }, 500);
   };
 
+  const handleTouchEnd = (event) => handleSwipeEnd(event.changedTouches[0]);
+  const handleMouseDown = (event) => {
+    touchStart.current = { x: event.clientX, y: event.clientY };
+    didSwipe.current = false;
+  };
+  const handleMouseUp = (event) => handleSwipeEnd({ x: event.clientX, y: event.clientY });
+
   if (!disputes.length) return null;
 
   if (carousel) {
@@ -57,6 +63,8 @@ export default function ActiveDisputesPanel({
       <section
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
         onTouchCancel={() => {
           touchStart.current = null;
         }}

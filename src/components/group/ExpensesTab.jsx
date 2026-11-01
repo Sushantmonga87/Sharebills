@@ -23,6 +23,7 @@ import {
 import { Button } from '../common/UI';
 import { formatCurrency } from '../../utils/currency';
 import ExpenseLongPressActions from './ExpenseLongPressActions';
+import EmptyState from '../common/EmptyState';
 
 const getCategoryMeta = (category = '') => {
   const cat = category.toLowerCase();
@@ -279,17 +280,13 @@ export default function ExpensesTab({
 
       {/* Expenses Feed */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200/90 bg-white px-6 py-12 text-center shadow-xs">
-          <div className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-            <Receipt size={20} />
-          </div>
-          <h2 className="text-sm font-bold text-slate-900">No transactions recorded</h2>
-          <p className="mx-auto mt-1 max-w-xs text-xs text-slate-500">
-            {payerFilter !== 'ALL'
-              ? 'No bills match this roommate filter.'
-              : 'Add a shared bill to start tracking balances.'}
-          </p>
-        </div>
+        <EmptyState
+          icon={Receipt}
+          title={payerFilter !== 'ALL' ? 'No matching bills' : 'No transactions recorded'}
+          description={payerFilter !== 'ALL'
+            ? 'No bills match this roommate filter.'
+            : 'Add a shared bill to start tracking balances.'}
+        />
       ) : (
         <div className="space-y-4">
           {expenseDateGroups.map((dateGroup) => (

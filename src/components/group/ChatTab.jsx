@@ -43,6 +43,7 @@ import { triggerPushNotification } from '../../utils/notifications';
 import { formatCurrency } from '../../utils/currency';
 import { CATEGORIES, PAYMENT_METHODS } from '../../utils/constants';
 import { uploadChatMedia } from '../../utils/cloudinaryUpload';
+import EmptyState from '../common/EmptyState';
 
 const EMOJI_CATEGORIES = {
   Recent: ['😀', '😂', '🥰', '😍', '😎', '😭', '😅', '🤔', '🙌', '👏', '👍', '👎', '🙏', '❤️', '🔥', '🎉', '✨', '💸', '🍕', '☕', '🏠', '✅', '❌'],
@@ -1261,17 +1262,14 @@ export default function ChatTab({
         }}
         className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 relative z-10 scrollbar-hide [overflow-anchor:none]"
       >
-        <div ref={messageContentRef} className="flow-root space-y-1">
+        <div ref={messageContentRef} className="flow-root min-h-full space-y-1">
           {visibleMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-6 pt-24">
-              <div className="w-16 h-16 rounded-3xl bg-white/80 backdrop-blur-md border border-white/80 text-sky-500 flex items-center justify-center mb-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                <MessageCircle size={30} />
-              </div>
-              <p className="font-extrabold text-slate-800 text-base">No messages yet</p>
-              <p className="text-xs text-slate-400 mt-1 max-w-[240px] leading-relaxed">
-                Chat, share receipts, notes, or coordinate room spending right here!
-              </p>
-            </div>
+            <EmptyState
+              icon={MessageCircle}
+              title="No messages yet"
+              description="Chat, share receipts, notes, or coordinate room spending right here!"
+              className="min-h-full border-0 bg-transparent"
+            />
           ) : (
             visibleMessages.map((msg, index) => {
               const isMe = msg.senderId === currentUser.id;

@@ -1431,12 +1431,19 @@ export default function App() {
     || getGroupSlug(group.name, group.id) === currentGroupRoute
   ));
   const pushUserId = activeUser?.id;
+  const pushNotificationsPaused = Boolean(activeUser?.notificationsPaused);
   useEffect(() => {
     if (!pushUserId) return;
+    if (pushNotificationsPaused) {
+      unregisterPushNotifications(pushUserId).catch((error) => {
+        console.error('Could not pause push notifications for this device.', error);
+      });
+      return;
+    }
     requestNotificationPermission({ id: pushUserId }).then((result) => {
       if (!result.success) console.warn('Push notifications are unavailable:', result.error);
     });
-  }, [pushUserId]);
+  }, [pushUserId, pushNotificationsPaused]);
 
   useEffect(() => {
     const handleNotificationAction = (notification) => {

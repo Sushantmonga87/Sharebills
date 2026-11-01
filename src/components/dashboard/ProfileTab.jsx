@@ -15,6 +15,7 @@ import {
   Edit2,
   Moon,
   Sun,
+  X,
 } from 'lucide-react';
 import {
   EmailAuthProvider,
@@ -30,6 +31,7 @@ import {
 import { auth } from '../../firebase';
 import { Button, Input } from '../common/UI';
 import { requestNotificationPermission, triggerPushNotification } from '../../utils/notifications';
+import ProfileSettingsPanel from './ProfileSettingsPanel';
 
 export default function ProfileTab({
   user,
@@ -54,6 +56,9 @@ export default function ProfileTab({
   const [fallbackToast, setFallbackToast] = useState(false);
   const [testPushStatus, setTestPushStatus] = useState('');
   const [testingPush, setTestingPush] = useState(false);
+  const [pushSetupStatus, setPushSetupStatus] = useState('');
+  const [settingUpPush, setSettingUpPush] = useState(false);
+  const [savingNotificationPreference, setSavingNotificationPreference] = useState(false);
   const canViewPushDiagnostics =
     user?.email?.trim().toLowerCase() === 'staranveer178@gmail.com';
 
@@ -86,6 +91,11 @@ export default function ProfileTab({
   };
 
   const handleTestPush = async () => {
+    if (user?.notificationsPaused) {
+      setTestPushStatus('Resume notifications before testing push delivery.');
+      return;
+    }
+
     setTestingPush(true);
     setTestPushStatus('Registering FCM Token...');
     try {
@@ -109,6 +119,47 @@ export default function ProfileTab({
       setTestPushStatus(`Trigger Error: ${err.message}`);
     } finally {
       setTestingPush(false);
+    }
+  };
+
+  const handleEnablePush = async () => {
+    if (user?.notificationsPaused) {
+      setPushSetupStatus('Resume notifications before enabling push on this device.');
+      return;
+    }
+
+    setSettingUpPush(true);
+    setPushSetupStatus('');
+    try {
+      const result = await requestNotificationPermission(user);
+      if (!result?.success) {
+        setPushSetupStatus(result?.error || 'Could not enable notifications on this device.');
+        return;
+      }
+      setPushSetupStatus('Notifications are enabled on this device.');
+    } catch (error) {
+      console.error('Could not enable push notifications:', error);
+      setPushSetupStatus(error.message || 'Could not enable notifications on this device.');
+    } finally {
+      setSettingUpPush(false);
+    }
+  };
+
+  const handleTogglePausedNotifications = async () => {
+    if (!onUpdateUser) {
+      setPushSetupStatus('Notification preferences are unavailable right now.');
+      return;
+    }
+
+    setSavingNotificationPreference(true);
+    setPushSetupStatus('');
+    try {
+      await onUpdateUser(user.id, { notificationsPaused: !user.notificationsPaused });
+    } catch (error) {
+      console.error('Could not update notification preference:', error);
+      setPushSetupStatus(error.message || 'Could not update notification preference.');
+    } finally {
+      setSavingNotificationPreference(false);
     }
   };
 
@@ -303,7 +354,7 @@ export default function ProfileTab({
   const getInitials = () => (user?.username || 'U').charAt(0).toUpperCase();
 
   return (
-    <div className={`mx-auto w-full max-w-4xl p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
+    <div className={`mx-auto w-full max-w-[1360px] p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
       <div className="mb-5 flex items-center justify-between gap-2.5">
         <div className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
@@ -317,161 +368,230 @@ export default function ProfileTab({
             Profile Settings
           </h1>
         </div>
-        {!isEditing && (
-          <div className="page-heading-controls flex flex-shrink-0 items-center gap-1 rounded-full p-1.5">
-            {onLogout && (
-              <button
-                type="button"
-                onClick={onLogout}
-                aria-label="Sign out"
-                title="Sign out"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-rose-600 transition-colors hover:bg-rose-50 hover:text-rose-700"
-              >
-                <LogOut size={16} />
-              </button>
-            )}
+        <div
+          className={`page-heading-controls flex h-11 flex-shrink-0 items-center gap-1 rounded-full p-1.5 ${
+            isEditing ? 'invisible' : ''
+          }`}
+          aria-hidden={isEditing}
+        >
+          {onLogout && (
             <button
               type="button"
-              onClick={() => {
-                setIsEditing(true);
-                setLocalError('');
-              }}
-              aria-label="Edit profile"
-              title="Edit profile"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-600"
+              onClick={onLogout}
+              aria-label="Sign out"
+              title="Sign out"
+              tabIndex={isEditing ? -1 : 0}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-rose-600 transition-colors hover:bg-rose-50 hover:text-rose-700"
             >
-              <Edit2 size={16} />
+              <LogOut size={16} />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {!isEditing ? (
-        <div className="space-y-4">
-          <div className={`rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs ${mobilePreview ? '' : 'sm:p-6'}`}>
-            <div className={`flex flex-col gap-4 ${mobilePreview ? '' : 'sm:flex-row sm:items-center'}`}>
-              <div className="relative inline-block">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+          <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs lg:col-span-5 lg:p-7">
+            <div className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
+              <UserCircle size={17} className="text-blue-600" />
+              <h2 className="text-sm font-bold text-slate-900">Profile ID</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(true);
+                  setLocalError('');
+                }}
+                aria-label="Edit profile"
+                title="Edit profile"
+                className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-600"
+              >
+                <Edit2 size={16} />
+              </button>
+            </div>
+            <div className="flex flex-col items-center rounded-2xl bg-gradient-to-br from-blue-50 via-white to-emerald-50 px-5 py-7 text-center">
+              <div className="relative mb-4">
                 {photoDataUrl ? (
                   <img
                     src={photoDataUrl}
                     alt={`${user?.username || 'User'} profile`}
-                    className="h-20 w-20 rounded-full object-cover border border-slate-200"
+                    className="h-24 w-24 rounded-full border-4 border-white object-cover shadow-md"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-900 text-2xl font-bold text-white">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-md">
                     {getInitials()}
                   </div>
                 )}
-                <span
-                  className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white"
-                  title="Active"
-                >
-                  <CheckCircle2 size={11} />
+                <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white">
+                  <CheckCircle2 size={12} />
                 </span>
               </div>
-
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-bold text-slate-900">{user?.username}</h2>
-                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                  <Mail size={14} className="text-slate-400" />
-                  <span>{user?.email || 'No email set'}</span>
-                </div>
-              </div>
+              <h3 className="max-w-full truncate text-xl font-extrabold text-slate-900">{user?.username || 'Sharebills member'}</h3>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Sharebills member</p>
             </div>
 
-            <div className={`mt-6 grid grid-cols-1 gap-3.5 ${mobilePreview ? '' : 'md:grid-cols-2'}`}>
-              <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700">
-                  <QrCode size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Settlement UPI ID
-                  </p>
-                  <p className="mt-0.5 truncate font-mono text-xs font-bold text-slate-900">
-                    {user?.upiId || (
-                      <span className="font-sans font-normal italic text-slate-400">
-                        Not configured
-                      </span>
-                    )}
-                  </p>
+            <dl className="mt-5 space-y-3">
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+                <Mail size={16} className="mt-0.5 flex-shrink-0 text-slate-500" />
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Email address</dt>
+                  <dd className="mt-0.5 break-all text-xs font-semibold text-slate-800">{user?.email || 'No email set'}</dd>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700">
-                  <KeyRound size={18} />
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+                <QrCode size={16} className="mt-0.5 flex-shrink-0 text-slate-500" />
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Settlement UPI ID</dt>
+                  <dd className="mt-0.5 break-all font-mono text-xs font-bold text-slate-800">{user?.upiId || 'Not configured'}</dd>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Password Security
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold tracking-widest text-slate-800">
-                    ••••••••
-                  </p>
+              </div>
+            </dl>
+            <div className="mt-4 flex items-start gap-2 rounded-xl bg-emerald-50/80 px-3.5 py-3 text-[11px] leading-relaxed text-slate-600">
+              <ShieldCheck size={15} className="mt-0.5 flex-shrink-0 text-emerald-600" />
+              <span>Your UPI handle is only visible to roommates inside your shared spaces.</span>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs lg:col-span-7 lg:p-7">
+            <div className="mb-5 border-b border-slate-100 pb-4">
+              <h2 className="text-sm font-bold text-slate-900">App settings</h2>
+              <p className="mt-1 text-[11px] text-slate-500">Appearance, notifications, and account security for this device.</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700">
+                    {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Appearance</p>
+                    <p className="text-[11px] text-slate-500">{theme === 'dark' ? 'Dark theme is on' : 'Light theme is on'}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={theme === 'dark'}
+                  aria-label="Dark mode"
+                  onClick={() => onThemeChange?.(theme === 'dark' ? 'light' : 'dark')}
+                  className="ios-theme-switch"
+                >
+                  <span className="ios-theme-switch__thumb" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700">
+                    <Bell size={17} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Pause notifications</p>
+                    <p className="text-[11px] text-slate-500">
+                      {user?.notificationsPaused
+                        ? 'Push alerts are paused on your devices.'
+                        : 'Push alerts are active on your devices.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(user?.notificationsPaused)}
+                  aria-label="Pause push notifications"
+                  disabled={savingNotificationPreference}
+                  onClick={handleTogglePausedNotifications}
+                  className={`ios-theme-switch ${savingNotificationPreference ? 'cursor-wait opacity-60' : ''}`}
+                >
+                  <span className="ios-theme-switch__thumb" />
+                </button>
+              </div>
+              {pushSetupStatus && (
+                <p role="status" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600">
+                  {pushSetupStatus}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700">
+                    <Bell size={17} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Push notifications</p>
+                    <p className="text-[11px] text-slate-500">
+                      {user?.notificationsPaused
+                        ? 'Paused in app settings.'
+                        : typeof Notification === 'undefined'
+                        ? 'Notifications are not supported in this browser.'
+                        : Notification.permission === 'granted'
+                          ? 'Allowed on this device.'
+                          : Notification.permission === 'denied'
+                            ? 'Blocked by browser settings.'
+                            : 'Get alerts for activity in your spaces.'}
+                    </p>
+                  </div>
+                </div>
+                {!user?.notificationsPaused && typeof Notification !== 'undefined' && Notification.permission !== 'denied' && (
+                  <button
+                    type="button"
+                    onClick={handleEnablePush}
+                    disabled={settingUpPush}
+                    className="flex-shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-blue-200 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {settingUpPush ? 'Setting up…' : Notification.permission === 'granted' ? 'Refresh setup' : 'Enable'}
+                  </button>
+                )}
+              </div>
+              {pushSetupStatus && (
+                <p role="status" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600">
+                  {pushSetupStatus}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700">
+                    <KeyRound size={17} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Password security</p>
+                    <p className="text-[11px] text-slate-500">Send a password reset link to your account email.</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleSendPasswordReset}
                   disabled={resetPasswordLoading}
-                  className="flex-shrink-0 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                  className="flex-shrink-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-blue-700 hover:border-blue-200 disabled:cursor-not-allowed disabled:text-slate-400"
                 >
-                  {resetPasswordLoading ? 'Sending…' : 'Forgot password?'}
+                  {resetPasswordLoading ? 'Sending…' : 'Reset password'}
                 </button>
               </div>
-            </div>
-
-            {resetPasswordFeedback && (
-              <p
-                role="status"
-                className={`mt-3 rounded-xl border p-3 text-xs ${
-                  resetPasswordFeedback.startsWith('If a password')
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-amber-200 bg-amber-50 text-amber-800'
-                }`}
-              >
-                {resetPasswordFeedback}
-              </p>
-            )}
-
-            <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">
-                  {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Dark mode</p>
-                  <p className="text-[11px] text-slate-500">
-                    {theme === 'dark' ? 'On' : 'Off'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={theme === 'dark'}
-                aria-label="Dark mode"
-                onClick={() => onThemeChange?.(theme === 'dark' ? 'light' : 'dark')}
-                className="ios-theme-switch"
-              >
-                <span
-                  className="ios-theme-switch__thumb"
-                />
-              </button>
+              {resetPasswordFeedback && (
+                <p
+                  role="status"
+                  className={`rounded-xl border p-3 text-xs ${
+                    resetPasswordFeedback.startsWith('If a password')
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-800'
+                  }`}
+                >
+                  {resetPasswordFeedback}
+                </p>
+              )}
             </div>
 
             {canViewPushDiagnostics && (
-              <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2.5">
+              <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700">
                       <Bell size={17} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">Push Notification Diagnostics</p>
-                      <p className="text-[11px] text-slate-500">
-                        Verify FCM delivery & device permissions
-                      </p>
+                      <p className="text-xs font-bold text-slate-900">Push notification diagnostics</p>
+                      <p className="text-[11px] text-slate-500">Verify delivery and device permissions.</p>
                     </div>
                   </div>
                   <button
@@ -480,36 +600,51 @@ export default function ProfileTab({
                     disabled={testingPush}
                     className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                   >
-                    {testingPush ? 'Testing...' : 'Test Push'}
+                    {testingPush ? 'Testing…' : 'Test push'}
                   </button>
                 </div>
                 {testPushStatus && (
-                  <p
-                    className={`rounded-lg p-2.5 font-mono text-xs break-all ${
-                      testPushStatus.startsWith('Success')
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : testPushStatus.startsWith('Error') ||
-                            testPushStatus.startsWith('Trigger Error')
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
+                  <p className={`rounded-lg border p-2.5 font-mono text-xs break-all ${
+                    testPushStatus.startsWith('Success')
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : testPushStatus.startsWith('Error') || testPushStatus.startsWith('Trigger Error')
+                        ? 'border-rose-200 bg-rose-50 text-rose-700'
+                        : 'bg-slate-100 text-slate-700'
+                  }`}>
                     {testPushStatus}
                   </p>
                 )}
               </div>
             )}
-
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">
-              <ShieldCheck size={15} className="text-emerald-600 flex-shrink-0" />
-              <span>
-                Your UPI handle is only visible to roommates inside your shared spaces.
-              </span>
-            </div>
-          </div>
+          </section>
         </div>
       ) : (
-        <form onSubmit={handleUpdateProfile} className="space-y-4">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+          <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs lg:col-span-5 lg:p-7">
+            <div className="mb-5 flex items-center justify-between gap-2 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <UserCircle size={17} className="text-blue-600" />
+                <h2 className="text-sm font-bold text-slate-900">Edit profile</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setLocalError('');
+                  setName(user?.username || '');
+                  setEmail(user?.email || '');
+                  setUpiId(user?.upiId || '');
+                  setPhotoDataUrl(user?.photoDataUrl || '');
+                  setCurrentPassword('');
+                  setPassword('');
+                }}
+                aria-label="Cancel editing profile"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
           {localError && (
             <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-medium text-rose-600">
               <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
@@ -567,6 +702,7 @@ export default function ProfileTab({
                   onChange={(event) => setName(event.target.value)}
                   placeholder="Your Name"
                   required
+                  style={{ fontSize: '14px' }}
                 />
               </div>
 
@@ -580,6 +716,7 @@ export default function ProfileTab({
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="your@email.com"
+                  style={{ fontSize: '14px' }}
                 />
               </div>
             </div>
@@ -592,7 +729,8 @@ export default function ProfileTab({
               <Input
                 value={upiId}
                 onChange={(event) => setUpiId(event.target.value)}
-                placeholder="e.g. username@okhdfcbank or 9876543210@paytm"
+                placeholder="e.g. name@bank"
+                style={{ fontSize: '14px' }}
               />
             </div>
 
@@ -605,9 +743,25 @@ export default function ProfileTab({
                 type="password"
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
-                placeholder="Required to link or change Firebase credentials"
+                placeholder={auth.currentUser?.isAnonymous
+                  ? 'Enter current Firebase password'
+                  : 'Enter your current password'}
                 autoComplete="current-password"
+                style={{ fontSize: '14px' }}
               />
+              <button
+                type="button"
+                onClick={handleSendPasswordReset}
+                disabled={resetPasswordLoading}
+                className="mt-1 text-xs font-semibold text-blue-700 hover:text-blue-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                {resetPasswordLoading ? 'Sending reset link…' : 'Forgot password?'}
+              </button>
+              {resetPasswordFeedback && (
+                <p role="status" className="mt-1 text-xs text-slate-600">
+                  {resetPasswordFeedback}
+                </p>
+              )}
             </div>
 
             <div>
@@ -622,6 +776,7 @@ export default function ProfileTab({
                 placeholder="Leave blank to keep the current password"
                 autoComplete="new-password"
                 minLength={6}
+                style={{ fontSize: '14px' }}
               />
               {auth.currentUser?.isAnonymous && (
                 <p className="mt-1.5 text-xs text-slate-500">
@@ -652,7 +807,27 @@ export default function ProfileTab({
               </Button>
             </div>
           </div>
-        </form>
+            </form>
+          </section>
+
+          <ProfileSettingsPanel
+            user={user}
+            theme={theme}
+            onThemeChange={onThemeChange}
+            savingNotificationPreference={savingNotificationPreference}
+            onTogglePausedNotifications={handleTogglePausedNotifications}
+            pushSetupStatus={pushSetupStatus}
+            settingUpPush={settingUpPush}
+            onEnablePush={handleEnablePush}
+            resetPasswordLoading={resetPasswordLoading}
+            onSendPasswordReset={handleSendPasswordReset}
+            resetPasswordFeedback={resetPasswordFeedback}
+            canViewPushDiagnostics={canViewPushDiagnostics}
+            testingPush={testingPush}
+            onTestPush={handleTestPush}
+            testPushStatus={testPushStatus}
+          />
+        </div>
       )}
 
       {fallbackToast && (

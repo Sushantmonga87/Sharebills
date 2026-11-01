@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Calendar, ChevronDown, CreditCard, Download, Receipt, User, Users, X } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import ExpenseLongPressActions from '../group/ExpenseLongPressActions';
+import RentSettlementsTab from './RentSettlementsTab';
+import EmptyState from '../common/EmptyState';
 
 const getExpenseDate = (expense) => {
   const value = expense.date || expense.createdAt;
@@ -50,8 +52,14 @@ export default function TransactionsTab({
   onCancelExpenseDispute,
   showToast,
   mobilePreview = false,
+  rents = [],
+  settlements = [],
+  disputes = [],
+  onOpenGroup,
+  onOpenDispute,
 }) {
   const [detailExpense, setDetailExpense] = useState(null);
+  const [disputesOpen, setDisputesOpen] = useState(false);
   const visibleTransactions = preview ? transactions.slice(0, 4) : transactions;
   const transactionGroups = [];
   const groupedByDate = new Map();
@@ -71,13 +79,16 @@ export default function TransactionsTab({
   });
 
   useEffect(() => {
-    if (!detailExpense) return undefined;
+    if (!detailExpense && !disputesOpen) return undefined;
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setDetailExpense(null);
+      if (event.key === 'Escape') {
+        setDetailExpense(null);
+        setDisputesOpen(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailExpense]);
+  }, [detailExpense, disputesOpen]);
 
   return (
     <section>
@@ -101,6 +112,7 @@ export default function TransactionsTab({
               { id: 'all', label: 'All' },
               { id: 'mine', label: 'Paid by Me' },
               { id: 'settlements', label: 'Settlements' },
+              { id: 'dues', label: 'Rent & Dues' },
             ].map((filter) => (
               <button
                 key={filter.id}
@@ -118,7 +130,7 @@ export default function TransactionsTab({
             ))}
           </div>
           <label className={`page-heading-controls relative flex h-10 flex-shrink-0 items-center gap-2 rounded-full px-3 text-xs font-semibold text-slate-700 ${mobilePreview ? '' : 'md:hidden'}`}>
-            <span className="pointer-events-none">{ledgerFilter === 'mine' ? 'Paid by Me' : ledgerFilter === 'settlements' ? 'Settlements' : 'All'}</span>
+            <span className="pointer-events-none">{ledgerFilter === 'mine' ? 'Paid by Me' : ledgerFilter === 'settlements' ? 'Settlements' : ledgerFilter === 'dues' ? 'Rent & Dues' : 'All'}</span>
             <ChevronDown size={14} className="pointer-events-none text-slate-400" />
             <select
               aria-label="Filter transactions"
@@ -129,6 +141,7 @@ export default function TransactionsTab({
               <option value="all">All</option>
               <option value="mine">Paid by Me</option>
               <option value="settlements">Settlements</option>
+              <option value="dues">Rent &amp; Dues</option>
             </select>
           </label>
           <button type="button" onClick={onOpenExport} aria-label="Export transactions" title="Export transactions" className="page-heading-controls flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-blue-600">
@@ -155,11 +168,53 @@ export default function TransactionsTab({
         </div>
       )}
 
-      {visibleTransactions.length === 0 ? (
-        <div className="py-8 text-center">
-          <Receipt size={22} className="mx-auto mb-2 text-slate-400" />
-          <p className="text-sm font-bold text-slate-700">No transactions yet</p>
-        </div>
+      {!preview && (
+        <button
+          type="button"
+          onClick={() => setDisputesOpen(true)}
+          aria-haspopup="dialog"
+          className={`fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-4 z-[70] flex h-11 items-center gap-2 rounded-full border border-amber-200 bg-white/95 px-4 text-xs font-bold text-amber-800 shadow-lg shadow-amber-900/10 backdrop-blur transition-transform ${
+            mobilePreview ? 'dispute-nudge' : 'dispute-nudge md:hidden'
+          }`}
+        >
+          <AlertTriangle size={15} />
+          Disputes
+          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold">
+            {disputes.length}
+          </span>
+        </button>
+      )}
+
+      <div className={preview ? '' : 'grid grid-cols-1 gap-6 md:grid-cols-12'}>
+        <div
+          className={
+            preview
+              ? ''
+              : `min-w-0 md:col-span-8 ${
+                  mobilePreview ? '' : 'liquid-glass rounded-3xl p-5'
+                }`
+          }
+        >
+      {ledgerFilter === 'dues' ? (
+        <RentSettlementsTab
+          rents={rents}
+          settlements={settlements}
+          disputes={[]}
+          groups={groups}
+          user={user}
+          getUserName={getUserName}
+          onOpenGroup={onOpenGroup}
+          onOpenDispute={onOpenDispute}
+          mobilePreview={mobilePreview}
+          showSettlements={false}
+          showDisputes={false}
+        />
+      ) : visibleTransactions.length === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="No transactions yet"
+          description="Your shared bills and payments will appear here."
+        />
       ) : (
         <div className="space-y-5">
           {transactionGroups.map((dateGroup) => (
@@ -235,6 +290,112 @@ export default function TransactionsTab({
             </section>
           ))}
         </div>
+      )}
+        </div>
+
+        {!preview && !mobilePreview && (
+          <aside className="hidden md:sticky md:top-4 md:col-span-4 md:block md:self-start">
+            <section className="liquid-glass rounded-3xl p-5">
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Active disputes</h2>
+                  <p className="text-[11px] text-slate-500">Open disputes across your spaces</p>
+                </div>
+                <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-800">{disputes.length}</span>
+              </div>
+              {disputes.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {disputes.map((expense) => {
+                    const group = groups.find((item) => item.id === expense.groupId);
+                    return (
+                      <button
+                        key={expense.id}
+                        type="button"
+                        onClick={() => onOpenDispute?.(expense)}
+                        className="dues-list-row mx-1 flex w-[calc(100%-0.5rem)] items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-amber-50/70"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                            <AlertTriangle size={17} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{expense.title || 'Expense'}</span>
+                            <span className="block truncate text-xs text-slate-500">
+                              {group?.name || 'Group'}{expense.activeDisputeByName ? ` · raised by ${expense.activeDisputeByName}` : ''}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="flex-shrink-0 font-mono text-xs font-bold text-slate-800">
+                          {formatCurrency(expense.totalAmount, group?.currency)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <AlertTriangle size={20} className="mx-auto mb-2 text-slate-400" />
+                  <p className="text-xs font-semibold text-slate-700">No active disputes</p>
+                  <p className="mt-1 text-[11px] text-slate-500">New disputes will appear here.</p>
+                </div>
+              )}
+            </section>
+          </aside>
+        )}
+      </div>
+
+      {disputesOpen && createPortal(
+        <div
+          className="app-modal-overlay fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setDisputesOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-disputes-title"
+            className="app-modal-surface max-h-[min(80dvh,42rem)] w-full max-w-lg overflow-y-auto rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)]"
+          >
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+              <h2 id="transaction-disputes-title" className="text-sm font-extrabold text-slate-900">
+                Disputes
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDisputesOpen(false)}
+                aria-label="Close disputes"
+                className="popup-close-button flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-600 text-white transition-colors hover:border-rose-700 hover:bg-rose-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {disputes.length > 0 ? (
+              <RentSettlementsTab
+                rents={[]}
+                settlements={[]}
+                disputes={disputes}
+                groups={groups}
+                user={user}
+                getUserName={getUserName}
+                onOpenGroup={onOpenGroup}
+                onOpenDispute={(expense) => {
+                  setDisputesOpen(false);
+                  onOpenDispute?.(expense);
+                }}
+                preview
+                showSettlements={false}
+              />
+            ) : (
+              <div className="py-10 text-center">
+                <AlertTriangle size={22} className="mx-auto mb-2 text-slate-400" />
+                <p className="text-sm font-bold text-slate-700">No active disputes</p>
+                <p className="mt-1 text-xs text-slate-500">Open disputes across your spaces will appear here.</p>
+              </div>
+            )}
+          </section>
+        </div>,
+        document.body
       )}
 
       {detailExpense && createPortal(

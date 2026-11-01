@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import SpaceLongPressActions from './SpaceLongPressActions';
+import EmptyState from '../common/EmptyState';
 
 export default function DesktopSpacesTab({
   groups,
@@ -95,21 +96,23 @@ export default function DesktopSpacesTab({
       </div>
 
       {groups.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/40 px-6 py-10 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-            <Users size={22} />
-          </div>
-          <p className="text-sm font-bold text-slate-800">
-            {spaceFilter === 'archived'
+        <EmptyState
+          icon={Users}
+          title={
+            spaceFilter === 'archived'
               ? 'No archived spaces'
               : spaceFilter === 'pinned'
                 ? 'No pinned spaces yet'
-                : 'No active spaces found'}
-          </p>
-          <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500">
-            Create a new room or join an existing flat using a 6-digit invite code.
-          </p>
-        </div>
+                : 'No active spaces found'
+          }
+          description={
+            spaceFilter === 'archived'
+              ? 'Archived spaces will appear here when you archive a room.'
+              : spaceFilter === 'pinned'
+                ? 'Pin an active space to keep it close at hand.'
+                : 'Create a new room or join an existing flat using a 6-digit invite code.'
+          }
+        />
       ) : (
         <div className={`grid grid-cols-1 gap-4 ${mobilePreview ? '' : 'md:grid-cols-2'}`}>
           {groups.map((group) => {

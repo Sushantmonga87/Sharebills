@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   X,
   MessageSquare,
+  Users,
   Trash2,
   LogOut,
   Smartphone,
@@ -37,6 +38,7 @@ import DesktopSpacesTab from './DesktopSpacesTab';
 import SpaceLongPressActions from './SpaceLongPressActions';
 import ExpenseLongPressActions from '../group/ExpenseLongPressActions';
 import ActiveDisputesPanel from '../common/ActiveDisputesPanel';
+import EmptyState from '../common/EmptyState';
 import TransactionsTab from './TransactionsTab';
 import RentSettlementsTab from './RentSettlementsTab';
 import TransactionExportModal from './TransactionExportModal';
@@ -74,11 +76,11 @@ export default function Dashboard({
   onThemeChange,
   showToast,
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(initialTab === 'dues' ? 'transactions' : initialTab);
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [spaceFilter, setSpaceFilter] = useState('active'); // 'active' | 'pinned' | 'archived'
   const [searchQuery, setSearchQuery] = useState('');
-  const [ledgerFilter, setLedgerFilter] = useState('all'); // 'all' | 'mine' | 'settlements'
+  const [ledgerFilter, setLedgerFilter] = useState(initialTab === 'dues' ? 'dues' : 'all');
   const [transactionExportOpen, setTransactionExportOpen] = useState(false);
   const [mobileSection, setMobileSection] = useState('spaces');
   const [copiedCodeId, setCopiedCodeId] = useState(null);
@@ -86,6 +88,8 @@ export default function Dashboard({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [dailyRentReminderRecords, setDailyRentReminderRecords] = useState([]);
   const dashboardRootRef = useRef(null);
+  const overviewLedgerBodyRef = useRef(null);
+  const [overviewLedgerBodyHeight, setOverviewLedgerBodyHeight] = useState(0);
 
   // Activity Drawer / Notification Center Popup State
   const [isActivityOpen, setIsActivityOpen] = useState(false);
@@ -102,6 +106,17 @@ export default function Dashboard({
   useEffect(() => () => {
     if (activityPressTimerRef.current) clearTimeout(activityPressTimerRef.current);
   }, []);
+
+  useLayoutEffect(() => {
+    const body = overviewLedgerBodyRef.current;
+    if (activeTab !== 'groups' || mobilePreview || !body) return undefined;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setOverviewLedgerBodyHeight(entry.contentRect.height);
+    });
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, [activeTab, mobilePreview, ledgerFilter]);
 
   useEffect(() => {
     if (!isNewMenuOpen) return undefined;
@@ -547,16 +562,6 @@ export default function Dashboard({
     };
   }, [myGroups, expenses, rentRecords, user?.id, archivedGroupIds, unreadMessagesByGroup]);
 
-  const overviewDisputes = activeDisputes.slice(0, 2);
-  const overviewRentPreview = groupMetrics.myUnpaidRents.slice(
-    0,
-    Math.max(0, 2 - overviewDisputes.length)
-  );
-  const overviewSettlementPreview = groupMetrics.allMySettlements.slice(
-    0,
-    Math.max(0, 2 - overviewDisputes.length - overviewRentPreview.length)
-  );
-
   const monthlySummary = useMemo(() => {
     const now = new Date();
     const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -654,6 +659,8 @@ export default function Dashboard({
       list = list.filter((e) => e.paidBy === user?.id);
     } else if (ledgerFilter === 'settlements') {
       list = list.filter((e) => e.isSettlement || e.category === 'Settlement');
+    } else if (ledgerFilter === 'dues') {
+      list = [];
     }
 
     if (searchQuery.trim()) {
@@ -966,16 +973,24 @@ export default function Dashboard({
                     />
                   )}
                   {visibleGroups.length === 0 ? (
-                    <div className="liquid-glass rounded-2xl px-4 py-7 text-center">
-                      <p className="text-sm font-bold text-slate-800">
-                        {spaceFilter === 'archived' ? 'No archived spaces' : 'No spaces yet'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {spaceFilter === 'archived'
+                    <EmptyState
+                      icon={Users}
+                      compact
+                      title={
+                        spaceFilter === 'archived'
+                          ? 'No archived spaces'
+                          : spaceFilter === 'pinned'
+                            ? 'No pinned spaces'
+                            : 'No spaces yet'
+                      }
+                      description={
+                        spaceFilter === 'archived'
                           ? 'Archive spaces anytime to organize your dashboard.'
-                          : 'Create a new shared room or join an existing flat with a code.'}
-                      </p>
-                    </div>
+                          : spaceFilter === 'pinned'
+                            ? 'Pin an active space to keep it close at hand.'
+                            : 'Create a shared room or join an existing flat with a code.'
+                      }
+                    />
                   ) : (
                     <div className="flex flex-col gap-3.5">
                       {visibleGroups.map((group) => {
@@ -1178,6 +1193,8 @@ export default function Dashboard({
                   onCancelExpenseDispute={onCancelExpenseDispute}
                   showToast={showToast}
                   mobilePreview={mobilePreview}
+                  disputes={activeDisputes}
+                  onOpenDispute={(expense) => handleOpenGroup(expense.groupId, 'chat')}
                 />
               </div>
             )}
@@ -1381,7 +1398,7 @@ export default function Dashboard({
                 </div>
               </div>
 
-              {/* 2. Desktop 4-Card Liquid Glass KPI Strip with Compressed Category Breakdown in Card 2 */}
+              {/* 2. Desktop overview summary cards */}
               <div
                 className={`grid grid-cols-2 gap-4 lg:grid-cols-4 ${
                   activeTab === 'groups' ? '' : 'hidden'
@@ -1430,61 +1447,26 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* Top Compressed Monthly Share Card with Segmented Category Bar */}
-                <div
+                <button
+                  type="button"
                   onClick={() => handleTabSwitch('monthly')}
-                  className="liquid-glass-interactive cursor-pointer rounded-3xl p-5"
+                  className="liquid-glass-interactive w-full cursor-pointer rounded-3xl p-5 text-left"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-500">
                       {monthlySummary.monthLabel} Share
                     </span>
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700">
                       <PieChart size={16} />
                     </span>
                   </div>
                   <p className="mt-2 font-mono text-2xl font-extrabold tracking-tight text-slate-900">
-                    ₹{monthlySummary.myShare.toFixed(2)}
+                    {formatCurrency(monthlySummary.myShare, 'INR')}
                   </p>
-
-                  {monthlySummary.categories.length > 0 ? (
-                    <div className="mt-2.5 space-y-1.5">
-                      {/* Compressed Segmented Distribution Bar */}
-                      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80">
-                        {monthlySummary.categories.slice(0, 4).map((cat, i) => {
-                          const barColors = [
-                            'bg-blue-600',
-                            'bg-blue-500',
-                            'bg-cyan-400',
-                            'bg-amber-400',
-                          ];
-                          return (
-                            <div
-                              key={cat.name}
-                              style={{ width: `${cat.pct}%` }}
-                              title={`${cat.name}: ₹${cat.amount.toFixed(0)} (${cat.pct}%)`}
-                              className={`h-full ${barColors[i % barColors.length]}`}
-                            />
-                          );
-                        })}
-                      </div>
-
-                      {/* Clean Non-Crowded Category Preview & Analytics Link */}
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                        <span className="truncate pr-1">
-                          {monthlySummary.categories.slice(0, 2).map((c) => `${c.name} ${c.pct}%`).join(' · ')}
-                        </span>
-                        <span className="flex-shrink-0 text-blue-600 font-bold hover:underline">
-                          Analytics →
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-[11px] font-semibold text-slate-400">
-                      Across {monthlySummary.billCount} bills · Analytics →
-                    </p>
-                  )}
-                </div>
+                  <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                    Your share across {monthlySummary.billCount} bill{monthlySummary.billCount === 1 ? '' : 's'}
+                  </p>
+                </button>
 
                 <button
                   type="button"
@@ -1510,32 +1492,35 @@ export default function Dashboard({
 
                 <button
                   type="button"
-                  onClick={() => handleTabSwitch('dues')}
+                  onClick={() => handleTabSwitch('transactions')}
                   className="liquid-glass-interactive w-full cursor-pointer rounded-3xl p-5 text-left"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">Pending Rent &amp; Settlements</span>
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
-                      <CheckCircle2 size={16} />
+                    <span className="text-xs font-bold text-slate-500">Bills This Month</span>
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-700">
+                      <Receipt size={16} />
                     </span>
                   </div>
                   <p className="mt-2 font-mono text-2xl font-extrabold tracking-tight text-slate-900">
-                    {groupMetrics.myUnpaidRents.length + groupMetrics.allMySettlements.length}
+                    {monthlySummary.billCount}
                   </p>
                   <p className="mt-2 text-[11px] font-semibold text-slate-500">
-                    {groupMetrics.myUnpaidRents.length} rent share{groupMetrics.myUnpaidRents.length === 1 ? '' : 's'} · {groupMetrics.allMySettlements.length} settlement{groupMetrics.allMySettlements.length === 1 ? '' : 's'}
+                    Across {activeGroups.length} active space{activeGroups.length === 1 ? '' : 's'}
                   </p>
                 </button>
+
               </div>
 
               {/* 3. Main 12-Column Desktop Bento Grid */}
-              <div className="grid grid-cols-12 gap-6 items-start">
+              <div className={`grid grid-cols-12 items-stretch gap-6 ${
+                activeTab === 'groups' && !mobilePreview ? 'xl:h-[min(70vh,720px)]' : ''
+              }`}>
                 {/* LEFT 8 COLUMNS: Recent Ledger (and Spaces Tab on Desktop) */}
                 <div
                   className={
                     activeTab === 'spaces' || activeTab === 'transactions'
                       ? 'col-span-12'
-                      : 'col-span-12 xl:col-span-8 space-y-6'
+                      : 'col-span-12 flex flex-col space-y-6 xl:col-span-8 xl:min-h-0'
                   }
                 >
                   {activeTab === 'spaces' && (
@@ -1571,6 +1556,10 @@ export default function Dashboard({
                       activeTab === 'groups' ? 'liquid-glass p-5' : ''
                     } ${
                       activeTab === 'groups' || activeTab === 'transactions' ? '' : 'hidden'
+                    } ${
+                      activeTab === 'groups' && !mobilePreview
+                          ? 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden'
+                          : ''
                     }`}
                   >
                     {activeTab !== 'transactions' && <>
@@ -1597,6 +1586,7 @@ export default function Dashboard({
                               { id: 'all', label: 'All' },
                               { id: 'mine', label: 'Paid by Me' },
                               { id: 'settlements', label: 'Settlements' },
+                              { id: 'dues', label: 'Rent & Dues' },
                             ].map((filter) => (
                               <button
                                 key={filter.id}
@@ -1614,7 +1604,7 @@ export default function Dashboard({
                             ))}
                           </div>
                           <label className={`page-heading-controls relative flex h-10 flex-shrink-0 items-center gap-2 rounded-full px-3 text-xs font-semibold text-slate-700 ${mobilePreview ? '' : 'md:hidden'}`}>
-                            <span className="pointer-events-none">{ledgerFilter === 'mine' ? 'Paid by Me' : ledgerFilter === 'settlements' ? 'Settlements' : 'All'}</span>
+                            <span className="pointer-events-none">{ledgerFilter === 'mine' ? 'Paid by Me' : ledgerFilter === 'settlements' ? 'Settlements' : ledgerFilter === 'dues' ? 'Rent & Dues' : 'All'}</span>
                             <ChevronDown size={14} className="pointer-events-none text-slate-400" />
                             <select
                               aria-label="Filter transactions"
@@ -1625,6 +1615,7 @@ export default function Dashboard({
                               <option value="all">All</option>
                               <option value="mine">Paid by Me</option>
                               <option value="settlements">Settlements</option>
+                              <option value="dues">Rent &amp; Dues</option>
                             </select>
                           </label>
                           <button type="button" onClick={() => setTransactionExportOpen(true)} aria-label="Export transactions" title="Export transactions" className="page-heading-controls flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-blue-600">
@@ -1639,7 +1630,7 @@ export default function Dashboard({
                               Recent Ledger Activity
                             </h2>
                             <p className="text-xs text-slate-500">
-                              Latest bills and settlements across all your rooms
+                              Bills, rent, and settlements across your spaces
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1649,15 +1640,16 @@ export default function Dashboard({
                                 onClick={() => handleTabSwitch('transactions')}
                                 className="rounded-xl px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50"
                               >
-                                See all
+                                See all activity
                                 <span aria-hidden="true"> →</span>
                               </button>
                             )}
-                            <div className="flex items-center gap-1 rounded-2xl bg-slate-200/60 p-1">
+                            <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl bg-slate-200/60 p-1">
                               {[
                                 { id: 'all', label: 'All' },
                                 { id: 'mine', label: 'Paid by Me' },
                                 { id: 'settlements', label: 'Settlements' },
+                                { id: 'dues', label: 'Rent & Dues' },
                               ].map((tab) => (
                                 <button
                                   key={tab.id}
@@ -1678,16 +1670,68 @@ export default function Dashboard({
                       )}
                     </div>
 
-                    {recentTransactions.length === 0 ? (
-                      <div className="py-8 text-center">
-                        <Receipt size={22} className="mx-auto mb-2 text-slate-400" />
-                        <p className="text-sm font-bold text-slate-700">No transactions yet</p>
-                      </div>
+                    <div
+                      ref={overviewLedgerBodyRef}
+                      className={activeTab === 'groups' && !mobilePreview ? 'xl:min-h-0 xl:flex-1 xl:overflow-hidden' : ''}
+                    >
+                    {ledgerFilter === 'dues' ? (
+                      <RentSettlementsTab
+                        rents={groupMetrics.myUnpaidRents}
+                        settlements={[]}
+                        disputes={[]}
+                        groups={myGroups}
+                        user={user}
+                        getUserName={getUserName}
+                        onOpenGroup={handleOpenGroup}
+                        preview
+                        showSettlements={false}
+                        showDisputes={false}
+                        maxRents={Math.max(0, Math.floor((overviewLedgerBodyHeight - 96) / 68))}
+                      />
+                    ) : recentTransactions.length === 0 ? (
+                      activeTab === 'groups' && !mobilePreview ? (
+                        <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-blue-200/80 bg-gradient-to-br from-blue-50/70 via-white/80 to-emerald-50/60 px-6 py-8 text-center">
+                          <div className="relative mb-4 flex h-28 w-36 items-center justify-center">
+                            <span className="absolute left-3 top-5 h-16 w-12 rotate-[-14deg] rounded-xl border border-emerald-100 bg-emerald-50 shadow-sm" />
+                            <span className="absolute right-3 top-3 h-16 w-12 rotate-[12deg] rounded-xl border border-blue-100 bg-blue-50 shadow-sm" />
+                            <span className="relative flex h-20 w-16 rotate-[-3deg] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white text-blue-600 shadow-md">
+                              <Receipt size={26} strokeWidth={1.7} />
+                              <span className="mt-2 h-1 w-7 rounded-full bg-blue-100" />
+                              <span className="mt-1 h-1 w-5 rounded-full bg-slate-100" />
+                            </span>
+                            <span className="absolute bottom-1 right-5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-emerald-100 text-emerald-700 shadow-sm">
+                              <Plus size={16} />
+                            </span>
+                            <span className="absolute left-5 top-1 h-2 w-2 rounded-full bg-amber-300" />
+                            <span className="absolute bottom-4 left-2 h-1.5 w-1.5 rounded-full bg-blue-300" />
+                          </div>
+                          <h3 className="text-sm font-extrabold text-slate-900">Your transactions will show here</h3>
+                          <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">
+                            Shared bills and payments will appear here as soon as your group adds them.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={openQuickExpenseModal}
+                            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+                          >
+                            <Plus size={14} />
+                            Add your first bill
+                          </button>
+                        </div>
+                      ) : (
+                        <EmptyState
+                          icon={Receipt}
+                          title="No transactions yet"
+                          description="Bills and payments will appear here when your group records them."
+                        />
+                      )
                     ) : (
-                      <div className="space-y-2">
-                        {(activeTab === 'groups'
-                          ? recentTransactions.slice(0, 4)
-                          : recentTransactions
+                      <div className={`flex flex-col gap-2 ${activeTab === 'groups' && !mobilePreview ? 'h-full overflow-hidden' : ''}`}>
+                        {(activeTab === 'groups' && !mobilePreview
+                          ? recentTransactions.slice(0, Math.max(1, Math.floor((overviewLedgerBodyHeight + 8) / 96)))
+                          : activeTab === 'groups'
+                            ? recentTransactions.slice(0, 4)
+                            : recentTransactions
                         ).map((exp) => {
                           const grp = myGroups.find((g) => g.id === exp.groupId);
                           const iPaid = exp.paidBy === user?.id;
@@ -1727,7 +1771,9 @@ export default function Dashboard({
                             >
                             <div
                               onClick={() => handleOpenGroup(exp.groupId, 'expenses')}
-                              className="flex items-center justify-between gap-4 rounded-2xl border border-white/80 bg-white/60 px-3.5 py-3 hover:bg-white/95 transition-all cursor-pointer"
+                              className={`flex items-center justify-between gap-4 rounded-2xl border border-white/80 bg-white/60 px-3.5 py-3 hover:bg-white/95 transition-all cursor-pointer ${
+                                activeTab === 'groups' && !mobilePreview ? 'xl:h-[88px] xl:overflow-hidden' : ''
+                              }`}
                             >
                               <div className="flex min-w-0 items-center gap-3">
                                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
@@ -1798,8 +1844,30 @@ export default function Dashboard({
                             </ExpenseLongPressActions>
                           );
                         })}
+                        {activeTab === 'groups'
+                          && !mobilePreview
+                          && recentTransactions.length <= Math.floor((overviewLedgerBodyHeight + 8) / 96)
+                          && recentTransactions.length <= 3 && (
+                            <div className="flex min-h-[120px] flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200/80 bg-gradient-to-br from-slate-50/80 to-blue-50/40 px-5 py-4 text-center">
+                              <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-white bg-white/90 text-blue-600 shadow-sm">
+                                <CircleDollarSign size={22} />
+                              </div>
+                              <p className="text-xs font-bold text-slate-700">You&apos;re all caught up</p>
+                              <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-slate-500">
+                                New shared activity will appear here. Add a bill whenever your group splits a cost.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={openQuickExpenseModal}
+                                className="mt-2 rounded-lg px-2.5 py-1 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-100/70"
+                              >
+                                Add a bill
+                              </button>
+                            </div>
+                          )}
                       </div>
                     )}
+                    </div>
                     </>}
                     <div className={activeTab === 'transactions' && !mobilePreview ? 'hidden md:block' : 'hidden'}>
                       <TransactionsTab
@@ -1815,6 +1883,11 @@ export default function Dashboard({
                         onRaiseExpenseDispute={onRaiseExpenseDispute}
                         onCancelExpenseDispute={onCancelExpenseDispute}
                         showToast={showToast}
+                        rents={groupMetrics.myUnpaidRents}
+                        settlements={groupMetrics.allMySettlements}
+                        disputes={activeDisputes}
+                        onOpenGroup={handleOpenGroup}
+                        onOpenDispute={(expense) => handleOpenGroup(expense.groupId, 'chat')}
                       />
                     </div>
                   </section>
@@ -1822,12 +1895,98 @@ export default function Dashboard({
 
                 {/* RIGHT 4 COLUMNS: Pinned Spaces + Live Settlements */}
                 <div
-                  className={`col-span-12 xl:col-span-4 space-y-6 ${
+                  className={`col-span-12 flex flex-col space-y-6 xl:col-span-4 ${
                     activeTab === 'groups' ? '' : 'hidden'
+                  } ${
+                    activeTab === 'groups' && !mobilePreview
+                      ? 'xl:h-full xl:min-h-0'
+                      : ''
                   }`}
                 >
+                  <section className="liquid-glass flex-shrink-0 rounded-3xl p-5">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-extrabold text-slate-900">
+                          {monthlySummary.monthLabel} share
+                        </h3>
+                        <p className="mt-1 text-[11px] text-slate-500">Your monthly spending by category</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleTabSwitch('monthly')}
+                        className="text-[11px] font-bold text-blue-600 hover:underline"
+                      >
+                        Analytics
+                      </button>
+                    </div>
+                    {monthlySummary.myShare > 0 ? (
+                      <div className="flex items-center justify-center gap-5">
+                        <div
+                          className="chart-donut-rotate relative h-32 w-32 flex-shrink-0 rounded-full"
+                          style={{
+                            background: `conic-gradient(${(() => {
+                              const colors = ['#203b27', '#a5e8b3', '#5a9f58', '#7b9585', '#cbd5e1'];
+                              let start = 0;
+                              return monthlySummary.categories.map((category, index) => {
+                                const end = start + (category.amount / monthlySummary.myShare) * 100;
+                                const segment = `${colors[index % colors.length]} ${start}% ${end}%`;
+                                start = end;
+                                return segment;
+                              }).join(', ') || '#e2e8f0 0% 100%';
+                            })()})`,
+                          }}
+                          role="img"
+                          aria-label={`Monthly share ${formatCurrency(monthlySummary.myShare)}. ${monthlySummary.categories.map((category) => `${category.name} ${category.pct}%`).join(', ')}`}
+                        >
+                          <div className="absolute inset-[19%] flex flex-col items-center justify-center rounded-full bg-white text-center">
+                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Your share</span>
+                            <span className="mt-0.5 max-w-full truncate px-1 font-mono text-sm font-extrabold text-slate-900">
+                              {formatCurrency(monthlySummary.myShare, 'INR', 0)}
+                            </span>
+                          </div>
+                        </div>
+                        <ul className="min-w-0 space-y-2">
+                          {monthlySummary.categories.slice(0, 4).map((category, index) => {
+                            const colors = ['#203b27', '#a5e8b3', '#5a9f58', '#7b9585'];
+                            return (
+                              <li key={category.name} className="flex min-w-0 items-center gap-2 text-[10px]">
+                                <span className="h-2 w-2 flex-shrink-0 rounded-sm" style={{ backgroundColor: colors[index] }} />
+                                <span className="min-w-0 flex-1 truncate text-slate-600">{category.name}</span>
+                                <span className="font-semibold text-slate-800">{category.pct}%</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleTabSwitch('monthly')}
+                        className="flex w-full flex-col items-center justify-center rounded-2xl bg-white/40 px-3 py-4 text-xs text-slate-500 transition-colors hover:bg-white/70"
+                      >
+                        <div
+                          className="relative mb-2 flex h-24 w-24 items-center justify-center rounded-full"
+                          style={{
+                            background: 'conic-gradient(#dbeafe 0deg 90deg, #e2e8f0 90deg 270deg, #d1fae5 270deg 360deg)',
+                          }}
+                          role="img"
+                          aria-label="No monthly spending data yet"
+                        >
+                          <div className="absolute inset-[18%] flex flex-col items-center justify-center rounded-full bg-white text-center">
+                            <PieChart size={17} className="text-slate-300" />
+                            <span className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">No spend</span>
+                          </div>
+                          <span className="absolute -right-1 top-2 h-3 w-3 rounded-full border-2 border-white bg-blue-300" />
+                          <span className="absolute -bottom-0.5 left-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-300" />
+                        </div>
+                        <span className="font-bold text-slate-700">Your monthly share starts here</span>
+                        <span className="mt-0.5 text-[10px] text-slate-500">Add a bill to see your spending breakdown.</span>
+                      </button>
+                    )}
+                  </section>
+
                   {/* PINNED SPACES WIDGET (Desktop Right Column) */}
-                  <section className="liquid-glass rounded-3xl p-5">
+                  <section className="liquid-glass flex min-w-0 flex-col overflow-hidden rounded-3xl p-5 xl:min-h-0 xl:flex-1">
                     <div className="mb-3.5 flex items-center justify-between border-b border-slate-200/60 pb-3">
                       <div>
                         <h3 className="text-sm font-extrabold text-slate-900">
@@ -1849,19 +2008,17 @@ export default function Dashboard({
                     </div>
 
                     {pinnedGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/40 px-4 py-8 text-center">
-                        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                          <Pin size={18} />
-                        </div>
-                        <p className="text-xs font-bold text-slate-800">
-                          No pinned spaces
-                        </p>
-                        <p className="mx-auto mt-1 max-w-[200px] text-[10px] text-slate-500">
-                          Pin spaces from the directory to see them here.
-                        </p>
-                      </div>
+                      <EmptyState
+                        icon={Pin}
+                        compact
+                        title="No pinned spaces"
+                        description="Pin a space from the directory for quick access."
+                        className="min-h-0 flex-1 overflow-hidden px-3"
+                      />
                     ) : (
-                      <div className="grid grid-cols-1 gap-2.5">
+                      <div
+                        className="grid grid-cols-1 gap-2.5 overflow-hidden rounded-2xl xl:min-h-0 xl:flex-1 xl:pr-1"
+                      >
                         {pinnedGroups.map((group) => {
                           const unreadCount = unreadMessagesByGroup[group.id] || 0;
 
@@ -1920,109 +2077,27 @@ export default function Dashboard({
                     )}
                   </section>
 
-                  {/* BALANCES & SETTLEMENTS */}
-                  <section className="liquid-glass rounded-3xl p-5">
-                    <div className="mb-3.5 flex items-center justify-between border-b border-slate-200/60 pb-3">
-                      <div>
-                        <h3 className="text-sm font-extrabold text-slate-900">
-                          Rent & Settlements
-                        </h3>
-                        <p className="text-[11px] text-slate-500">
-                          Smart optimized dues across spaces
-                        </p>
+                  {activeDisputes.length > 0 && (
+                    <section className="liquid-glass flex-shrink-0 rounded-3xl p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-extrabold text-slate-900">Active disputes</h3>
+                          <p className="text-[11px] text-slate-500">Swipe to browse · tap to open chat</p>
+                        </div>
+                        <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-800">
+                          {activeDisputes.length}
+                        </span>
                       </div>
-                      <span className="rounded-lg bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
-                        {groupMetrics.myUnpaidRents.length + groupMetrics.allMySettlements.length + activeDisputes.length}
-                      </span>
-                    </div>
+                      <ActiveDisputesPanel
+                        disputes={activeDisputes}
+                        groups={myGroups}
+                        onOpenDispute={(expense) => handleOpenGroup(expense.groupId, 'chat')}
+                        carousel
+                        compact
+                      />
+                    </section>
+                  )}
 
-                    <ActiveDisputesPanel
-                      disputes={overviewDisputes}
-                      groups={myGroups}
-                      onOpenDispute={(expense) => handleOpenGroup(expense.groupId, 'chat')}
-                      inline
-                    />
-                    {groupMetrics.myUnpaidRents.length === 0
-                      && groupMetrics.allMySettlements.length === 0
-                      && activeDisputes.length === 0 ? (
-                      <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200/70 p-4 text-center">
-                        <CheckCircle2 size={20} className="mx-auto mb-1 text-emerald-600" />
-                        <p className="text-xs font-bold text-emerald-950">All Settled Up</p>
-                      </div>
-                    ) : overviewRentPreview.length > 0 || overviewSettlementPreview.length > 0 ? (
-                      <div className="space-y-2.5">
-                        {overviewRentPreview.map((rent) => (
-                          <div
-                            key={`rent-${rent.id}`}
-                            onClick={() => handleOpenGroup(rent.groupId, 'members')}
-                            className="desktop-rent-row flex items-center justify-between gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-3 transition-all hover:bg-amber-50 cursor-pointer shadow-sm"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-slate-900">
-                                {rent.groupName} · {new Date(`${rent.month}-01T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} rent
-                              </p>
-                              <p className="truncate text-[11px] text-slate-500">Unpaid rent share</p>
-                            </div>
-                            <div className="flex flex-shrink-0 items-center gap-2">
-                              <span className="font-mono text-xs font-extrabold text-amber-800">
-                                {formatCurrency(rent.shares?.[user?.id], rent.currency)}
-                              </span>
-                              <span className="rounded-xl bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
-                                Rent
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                        {overviewSettlementPreview.map((s, idx) => {
-                          const iOwe = s.from === user?.id;
-                          const counterparty = getUserName(iOwe ? s.to : s.from);
-                          return (
-                            <div
-                              key={`${s.groupId}-${idx}`}
-                              onClick={() => handleOpenGroup(s.groupId, 'balances')}
-                              className="desktop-settlement-row flex items-center justify-between gap-3 rounded-2xl border border-white/90 bg-white/70 p-3 hover:bg-white transition-all cursor-pointer shadow-sm"
-                            >
-                              <div className="min-w-0">
-                                <p className="truncate text-xs font-bold text-slate-900">
-                                  {iOwe ? `To pay ${counterparty}` : `To receive from ${counterparty}`}
-                                </p>
-                                <p className="truncate text-[11px] text-slate-500">
-                                  in {s.groupName}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span
-                                  className={`font-mono text-xs font-extrabold ${
-                                    iOwe ? 'text-rose-600' : 'text-emerald-600'
-                                  }`}
-                                >
-                                  {iOwe ? '-' : '+'}{formatCurrency(
-                                    s.amount,
-                                    myGroups.find((group) => group.id === s.groupId)?.currency
-                                  )}
-                                </span>
-                                <span className="rounded-xl bg-gradient-to-b from-blue-600 to-blue-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
-                                  Settle
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                    {activeDisputes.length + groupMetrics.myUnpaidRents.length + groupMetrics.allMySettlements.length > 2 && (
-                      <div className="mt-3 border-t border-slate-200/60 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleTabSwitch('dues')}
-                          className="overview-dues-more flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold text-blue-600 transition-colors hover:bg-blue-50"
-                        >
-                          <span>View more rent, dues &amp; disputes</span>
-                          <ChevronRight size={14} aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
-                  </section>
                 </div>
               </div>
             </div>
@@ -2036,21 +2111,6 @@ export default function Dashboard({
           activeTab !== 'spaces' &&
           activeTab !== 'transactions' && (
             <div className="h-full">
-              {activeTab === 'dues' && (
-                <div className={mobilePreview ? '' : 'hidden md:block'}>
-                  <RentSettlementsTab
-                    rents={groupMetrics.myUnpaidRents}
-                    settlements={groupMetrics.allMySettlements}
-                    disputes={activeDisputes}
-                    groups={myGroups}
-                    user={user}
-                    getUserName={getUserName}
-                    onOpenGroup={handleOpenGroup}
-                    onOpenDispute={(expense) => handleOpenGroup(expense.groupId, 'chat')}
-                    mobilePreview={mobilePreview}
-                  />
-                </div>
-              )}
               {activeTab === 'monthly' && (
                 <MonthlyAnalyticsTab
                   user={user}

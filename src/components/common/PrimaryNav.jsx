@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ArrowLeftRight,
-  CircleDollarSign,
   LayoutGrid,
   LogOut,
   Download,
@@ -18,12 +17,11 @@ const ITEMS = [
   { id: 'groups', label: 'Overview', mobileLabel: 'Overview', icon: LayoutGrid },
   { id: 'spaces', label: 'Spaces', mobileLabel: 'Spaces', icon: Users },
   { id: 'transactions', label: 'Transactions', mobileLabel: 'Transactions', icon: ArrowLeftRight },
-  { id: 'dues', label: 'Rent & Settlements', mobileLabel: 'Dues', icon: CircleDollarSign },
   { id: 'monthly', label: 'Analytics', mobileLabel: 'Monthly', icon: PieChart },
   { id: 'profile', label: 'Profile', mobileLabel: 'Profile', icon: User },
 ];
 
-const MOBILE_ITEMS = ITEMS.filter(({ id }) => id !== 'spaces' && id !== 'dues');
+const MOBILE_ITEMS = ITEMS.filter(({ id }) => id !== 'spaces');
 
 export default function PrimaryNav({
   activeItem,

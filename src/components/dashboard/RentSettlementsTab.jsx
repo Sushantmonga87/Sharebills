@@ -11,7 +11,14 @@ export default function RentSettlementsTab({
   onOpenGroup,
   onOpenDispute,
   mobilePreview = false,
+  preview = false,
+  showSettlements = true,
+  showDisputes = true,
+  maxRents,
 }) {
+  const visibleRents = Number.isFinite(maxRents) ? rents.slice(0, maxRents) : rents;
+  const visibleDisputes = showDisputes ? disputes : [];
+
   const getMonthLabel = (month) => {
     const date = new Date(`${month}-01T00:00:00`);
     return Number.isNaN(date.getTime())
@@ -20,8 +27,8 @@ export default function RentSettlementsTab({
   };
 
   return (
-    <section className={`mx-auto max-w-[1320px] space-y-5 p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
-      <header className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
+    <section className={preview ? 'space-y-4' : `mx-auto max-w-[1320px] space-y-5 p-4 pb-20 ${mobilePreview ? '' : 'sm:p-6 lg:p-8'}`}>
+      {!preview && <header className="page-heading flex min-w-0 items-center gap-2.5 rounded-full p-0 pr-4">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-gradient-to-tr from-blue-600 to-blue-600 text-xs font-bold text-white shadow-sm">
           {user?.photoDataUrl ? (
             <img src={user.photoDataUrl} alt="" className="h-full w-full object-cover" />
@@ -33,17 +40,23 @@ export default function RentSettlementsTab({
           <h1 className="truncate text-sm font-extrabold tracking-tight text-slate-900">Rent &amp; Settlements</h1>
           <p className="text-[11px] text-slate-500">Pending rent, disputes, and balances</p>
         </div>
-      </header>
+      </header>}
 
-      {rents.length === 0 && settlements.length === 0 && disputes.length === 0 ? (
+      {rents.length === 0 && (!showSettlements || settlements.length === 0) && visibleDisputes.length === 0 ? (
         <div className="rounded-2xl border border-slate-200/90 bg-white px-5 py-12 text-center shadow-xs">
           <CheckCircle2 size={26} className="mx-auto mb-2 text-emerald-600" />
           <p className="text-sm font-bold text-slate-900">All balances settled</p>
-          <p className="mt-1 text-xs text-slate-500">No pending rent, disputes, or settlements across your spaces.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {showSettlements
+              ? 'No pending rent, disputes, or settlements across your spaces.'
+              : showDisputes
+                ? 'No pending rent or disputes across your spaces.'
+                : 'No pending rent across your spaces.'}
+          </p>
         </div>
       ) : (
-        <div className={`grid grid-cols-1 items-start gap-6 ${mobilePreview ? '' : 'xl:grid-cols-12'}`}>
-          <div className={`space-y-5 ${mobilePreview ? 'order-2' : 'order-2 xl:order-1 xl:col-span-8'}`}>
+        <div className={`grid grid-cols-1 items-start gap-4 ${!preview && !mobilePreview ? 'xl:grid-cols-12' : ''}`}>
+          <div className={`space-y-4 ${preview ? '' : mobilePreview ? 'order-2' : 'order-2 xl:order-1 xl:col-span-8'}`}>
             {rents.length > 0 && (
             <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
               <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
@@ -54,7 +67,7 @@ export default function RentSettlementsTab({
                 <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-800">{rents.length}</span>
               </div>
               <div className="divide-y divide-slate-100">
-                {rents.map((rent) => (
+                {visibleRents.map((rent) => (
                   <button
                     key={rent.id}
                     type="button"
@@ -81,7 +94,7 @@ export default function RentSettlementsTab({
             </section>
           )}
 
-            {settlements.length > 0 && (
+            {showSettlements && settlements.length > 0 && (
             <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
               <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -120,18 +133,18 @@ export default function RentSettlementsTab({
           )}
           </div>
 
-          {disputes.length > 0 && (
-            <aside className={mobilePreview ? 'order-1' : 'order-1 xl:sticky xl:top-4 xl:order-2 xl:col-span-4'}>
+          {visibleDisputes.length > 0 && (
+            <aside className={preview ? '' : mobilePreview ? 'order-1' : 'order-1 xl:sticky xl:top-4 xl:order-2 xl:col-span-4'}>
               <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
                 <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                   <div>
                     <h2 className="text-sm font-bold text-slate-900">Active disputes</h2>
                     <p className="text-[11px] text-slate-500">Open expense disputes across your spaces</p>
                   </div>
-                  <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-800">{disputes.length}</span>
+                  <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-800">{visibleDisputes.length}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {disputes.map((expense) => {
+                  {visibleDisputes.map((expense) => {
                     const group = groups.find((item) => item.id === expense.groupId);
                     return (
                       <button
