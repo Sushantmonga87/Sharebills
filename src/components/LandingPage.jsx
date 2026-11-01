@@ -1962,7 +1962,7 @@ export default function LandingPage({
                 </div>
 
                 <a
-                  href="/sharebills-android.apk"
+                  href="/sharebills.apk"
                   download="Sharebills-Android.apk"
                   onClick={closePreviewModal}
                   className="block rounded-2xl border border-[#8EB89A] bg-[#EEF4EF] p-4 transition-colors hover:bg-[#DDE9DF]"
