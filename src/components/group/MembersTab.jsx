@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 import {
   AlertTriangle,
   Copy,
@@ -105,11 +107,23 @@ export default function MembersTab({
   };
 
   const shareInviteLink = async () => {
+    const title = `Join ${group.name} on Sharebills`;
+    const text = `Join our shared group "${group.name}". Use code: ${group.inviteCode}`;
     try {
+      if (Capacitor.isNativePlatform()) {
+        await Share.share({
+          title,
+          text,
+          url: inviteUrl,
+          dialogTitle: 'Share group invite',
+        });
+        return;
+      }
+
       if (navigator.share) {
         await navigator.share({
-          title: `Join ${group.name} on Sharebills`,
-          text: `Join our shared group "${group.name}". Use code: ${group.inviteCode}`,
+          title,
+          text,
           url: inviteUrl,
         });
       } else {

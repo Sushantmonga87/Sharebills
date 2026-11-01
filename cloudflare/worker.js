@@ -326,6 +326,22 @@ async function firestoreRequest(env, path, options = {}) {
   return payload;
 }
 
+async function saveUserPushTokens(env, userId, tokens, updateTime) {
+  const precondition = updateTime
+    ? `&currentDocument.updateTime=${encodeURIComponent(updateTime)}`
+    : '';
+  return firestoreRequest(
+    env,
+    `users/${encodeURIComponent(userId)}?updateMask.fieldPaths=fcmTokens${precondition}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        fields: toFirestoreFields({ fcmTokens: tokens }),
+      }),
+    },
+  );
+}
+
 async function parseRequestJson(request) {
   const text = await request.text();
   if (new TextEncoder().encode(text).length > MAX_RECORD_BYTES) throw new Error('Record is too large for the admin editor');
@@ -545,9 +561,13 @@ async function handlePushRequest(request, env) {
     const fallbackIcon = new URL('/sharebills-notification-icon.png', request.url).href;
     const notificationImage = avatarUrl || fallbackIcon;
 
-    const tokens = [...new Set((Array.isArray(user.fcmTokens) ? user.fcmTokens : [])
+    const storedTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens : [];
+    const tokens = [...new Set(storedTokens
       .filter((token) => typeof token === 'string' && token.length > 0))];
     if (!tokens.length) {
+      if (storedTokens.length) {
+        await saveUserPushTokens(env, recipientId, [], userDocument.updateTime);
+      }
       return jsonResponse({ success: false, message: 'No registered device tokens found', count: 0 }, 200, corsHeaders);
     }
 
@@ -573,12 +593,13 @@ async function handlePushRequest(request, env) {
                 notification: {
                   channel_id: 'default',
                   sound: 'default',
-                  icon: 'ic_stat_roomsplit',
+                  icon: 'ic_stat_sharebills',
                   color: '#3E7754',
                   image: notificationImage,
                 },
               },
               webpush: {
+                headers: { Urgency: 'high' },
                 fcm_options: {
                   link: new URL('/', request.url).href,
                 },
@@ -587,19 +608,44 @@ async function handlePushRequest(request, env) {
                   badge: new URL('/sharebills-notification-badge.png', request.url).href,
                 },
               },
-              apns: { payload: { aps: { sound: 'default' } } },
+              apns: {
+                headers: { 'apns-priority': '10' },
+                payload: { aps: { sound: 'default' } },
+              },
             },
           }),
         },
       );
-      return { ok: response.ok, status: response.status };
+      const payload = await response.json().catch(() => ({}));
+      const errorStatus = payload.error?.status;
+      const unregistered = errorStatus === 'UNREGISTERED'
+        || payload.error?.details?.some((detail) => detail.errorCode === 'UNREGISTERED');
+      return { ok: response.ok, status: response.status, token, unregistered };
     }));
     const count = results.filter((result) => result.ok).length;
+    const staleTokens = results
+      .filter((result) => result.unregistered)
+      .map((result) => result.token);
+    const retainedTokens = tokens.filter((token) => !staleTokens.includes(token));
+    const hasDuplicateOrInvalidEntries = tokens.length !== storedTokens.length;
+    let tokenCleanupWarning = '';
+    if (hasDuplicateOrInvalidEntries || staleTokens.length) {
+      try {
+        await saveUserPushTokens(env, recipientId, retainedTokens, userDocument.updateTime);
+      } catch (error) {
+        tokenCleanupWarning = 'Push tokens could not be fully cleaned up.';
+        console.error('Could not remove stale push tokens:', error instanceof Error ? error.message : 'Unknown error');
+      }
+    }
     if (!count) {
-      console.error('FCM delivery failed:', results.map((result) => result.status));
+      console.error('FCM delivery failed:', results.map(({ status }) => status));
       return jsonResponse({ success: false, error: 'FCM rejected all registered device tokens', count: 0 }, 502, corsHeaders);
     }
-    return jsonResponse({ success: true, count }, 200, corsHeaders);
+    return jsonResponse({
+      success: true,
+      count,
+      ...(tokenCleanupWarning ? { tokenCleanupWarning } : {}),
+    }, 200, corsHeaders);
   } catch (error) {
     const rawDetails = error instanceof Error ? error.message : 'Unknown error';
     const details = rawDetails

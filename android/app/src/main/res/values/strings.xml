@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">SplitBills</string>
-    <string name="title_activity_main">SplitBills</string>
+    <string name="app_name">Sharebills</string>
+    <string name="title_activity_main">Sharebills</string>
     <string name="package_name">com.taranveer.splitbills</string>
     <string name="custom_url_scheme">com.taranveer.splitbills</string>
 </resources>

@@ -46,7 +46,7 @@ export default function AuthScreen({
   onSaveUser,
   onLogin,
   initialMode = null,
-  isStandalonePwa = false,
+  isStandaloneApp = false,
   onBackToLanding,
   theme = 'light',
   onThemeChange,
@@ -568,7 +568,7 @@ export default function AuthScreen({
 
   return (
     <main className="auth-page-shell min-h-[100dvh] w-full font-sans flex items-center justify-center md:p-6 relative overflow-hidden">
-      {!isStandalonePwa && (
+      {!isStandaloneApp && (
         <button
           type="button"
           onClick={() => onThemeChange?.(theme === 'dark' ? 'light' : 'dark')}
@@ -596,7 +596,7 @@ export default function AuthScreen({
             <p className="relative mt-3 max-w-xs text-sm leading-relaxed text-emerald-50/85">
               Shared expenses, clear balances, and no awkward money reminders.
             </p>
-            {!isStandalonePwa && (
+            {!isStandaloneApp && (
               <div className="relative mt-5 w-full max-w-[310px] rounded-[22px] border border-white/20 bg-white/10 p-3.5 text-left shadow-xl shadow-black/10 backdrop-blur-md">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2.5">
@@ -677,7 +677,7 @@ export default function AuthScreen({
                   ? 'Sign in'
                   : 'Create account'}
             </h2>
-            {!isStandalonePwa && (
+            {!isStandaloneApp && (
               <button
                 type="button"
                 onClick={() => onThemeChange?.(theme === 'dark' ? 'light' : 'dark')}
@@ -735,7 +735,7 @@ export default function AuthScreen({
 
           <div className="auth-desktop-form-panel flex items-center justify-center bg-[#fbfdfb] p-10 lg:p-14">
             <div className="w-full max-w-md">
-              {!isStandalonePwa || isSheetOpen ? (
+              {!isStandaloneApp || isSheetOpen ? (
                 <>
                   <button
                     type="button"

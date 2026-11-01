@@ -6,7 +6,7 @@
     android:viewportHeight="108"
     android:viewportWidth="108">
 
-    <!-- RoomSplit Brand Gradient Background -->
+    <!-- Sharebills brand background -->
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
@@ -15,12 +15,8 @@
                 android:endX="108"
                 android:endY="108"
                 android:type="linear">
-                <!-- Tailwind blue-600 -->
-                <item android:color="#2563EB" android:offset="0.0" />
-                <!-- Tailwind blue-700 -->
-                <item android:color="#1D4ED8" android:offset="0.5" />
-                <!-- Tailwind indigo-900 -->
-                <item android:color="#312E81" android:offset="1.0" />
+                <item android:color="#3E7754" android:offset="0.0" />
+                <item android:color="#2C593D" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>

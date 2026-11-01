@@ -108,14 +108,15 @@ export default function ProfileTab({
         return;
       }
       setTestPushStatus('Device registered. Sending test push...');
-      await triggerPushNotification({
+      const result = await triggerPushNotification({
         senderId: user.id,
         recipientId: user.id,
         title: 'Test Push Notification',
         message: 'Push notifications are working correctly on Sharebills!',
         groupId: '',
       });
-      setTestPushStatus('Success! Test push notification sent to your device.');
+      const deviceCount = result.count === 1 ? '1 registered device' : `${result.count} registered devices`;
+      setTestPushStatus(`Success! Test push notification sent to ${deviceCount}.`);
       if (typeof showToast === 'function') showToast('Test push notification sent!');
     } catch (err) {
       console.error('Test push failed:', err);

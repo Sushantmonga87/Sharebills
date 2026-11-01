@@ -4,11 +4,11 @@ import { deleteToken, getMessaging, getToken, onMessage, isSupported } from 'fir
 import { reload } from 'firebase/auth';
 import {
   arrayRemove,
-  arrayUnion,
   collection,
   doc,
   getDocs,
   query,
+  runTransaction,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -82,15 +82,28 @@ async function bindTokenToUser(token, userId) {
       throw new Error('The device token is associated with too many accounts to update safely.');
     }
 
-    const batch = writeBatch(db);
-    previousOwners.forEach((userDoc) => {
-      batch.update(userDoc.ref, { fcmTokens: arrayRemove(token) });
+    const ownerRefs = [...previousOwners.map((userDoc) => userDoc.ref), doc(db, 'users', userId)];
+    const bound = await runTransaction(db, async (transaction) => {
+      const ownerDocs = await Promise.all(ownerRefs.map((ownerRef) => transaction.get(ownerRef)));
+      if (desiredUserId !== userId) return false;
+
+      ownerDocs.forEach((ownerDoc) => {
+        if (ownerDoc.id === userId) {
+          const currentTokens = ownerDoc.exists() && Array.isArray(ownerDoc.data().fcmTokens)
+            ? ownerDoc.data().fcmTokens.filter((savedToken) => typeof savedToken === 'string' && savedToken)
+            : [];
+          transaction.set(ownerDoc.ref, {
+            fcmTokens: [...new Set([...currentTokens, token])],
+            lastActive: new Date().toISOString(),
+          }, { merge: true });
+        } else if (ownerDoc.exists()) {
+          transaction.update(ownerDoc.ref, { fcmTokens: arrayRemove(token) });
+        }
+      });
+
+      return true;
     });
-    batch.set(doc(db, 'users', userId), {
-      fcmTokens: arrayUnion(token),
-      lastActive: new Date().toISOString(),
-    }, { merge: true });
-    await batch.commit();
+    if (!bound) return false;
 
     if (desiredUserId === userId) {
       boundToken = token;
@@ -240,14 +253,28 @@ async function registerNativePush(userId) {
 }
 
 async function registerWebPush(userId) {
+  if (!('Notification' in window)
+    || !('serviceWorker' in navigator)
+    || !('PushManager' in window)) {
+    return { success: false, error: 'Web push notifications are not supported on this browser.' };
+  }
+
+  const permissionRequest = Notification.permission === 'default'
+    ? Notification.requestPermission()
+    : Promise.resolve(Notification.permission);
   const supported = await isSupported();
   if (!supported || !('Notification' in window)) {
     return { success: false, error: 'Notifications unsupported on browser.' };
   }
 
-  const permission = await Notification.requestPermission();
+  const permission = await permissionRequest;
   if (permission !== 'granted') {
-    return { success: false, error: 'Notification permission denied.' };
+    return {
+      success: false,
+      error: permission === 'denied'
+        ? 'Notification permission is blocked in browser settings.'
+        : 'Notification permission was not granted.',
+    };
   }
 
   const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');

@@ -180,10 +180,12 @@ if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
 
 export default function App() {
   const [initialRoute] = useState(getRouteFromLocation);
-  const isStandalonePwa = !Capacitor.isNativePlatform() && (
+  const isNativeApp = Capacitor.isNativePlatform();
+  const isStandalonePwa = !isNativeApp && (
     window.matchMedia?.('(display-mode: standalone)').matches
       || window.navigator.standalone === true
   );
+  const isAppWelcomeScreen = isNativeApp || isStandalonePwa;
   const [activeUserId, setActiveUserId] = useState(
     () => {
       const storedUserId = localStorage.getItem('rs_active_user_id');
@@ -266,8 +268,8 @@ export default function App() {
   const sharedNotificationSounds = users.find(
     (user) => user.email?.trim().toLowerCase() === NOTIFICATION_SOUND_ADMIN_EMAIL
   )?.notificationSounds;
-  const isLandingPageVisible = !activeUser && !authMode && !isStandalonePwa;
-  const isLightWelcomeVisible = !activeUser && (isLandingPageVisible || isStandalonePwa);
+  const isLandingPageVisible = !activeUser && !authMode && !isAppWelcomeScreen;
+  const isLightWelcomeVisible = !activeUser && (isLandingPageVisible || isAppWelcomeScreen);
 
   useLayoutEffect(() => {
     notificationSoundSettingsRef.current = { activeUser, sharedNotificationSounds };
@@ -1498,6 +1500,10 @@ export default function App() {
       });
       return;
     }
+    if (!Capacitor.isNativePlatform()
+      && (typeof Notification === 'undefined' || Notification.permission !== 'granted')) {
+      return;
+    }
     requestNotificationPermission({ id: pushUserId }).then((result) => {
       if (!result.success) console.warn('Push notifications are unavailable:', result.error);
     });
@@ -1579,7 +1585,7 @@ export default function App() {
           }}
         />
       )}
-      {!activeUser && (authMode || isStandalonePwa) ? (
+      {!activeUser && (authMode || isAppWelcomeScreen) ? (
         <AuthScreen
           key={authMode}
           users={users}
@@ -1587,8 +1593,8 @@ export default function App() {
           onSaveUser={saveUser}
           onLogin={handleLogin}
           initialMode={authMode || 'signup'}
-          isStandalonePwa={isStandalonePwa}
-          onBackToLanding={isStandalonePwa ? undefined : () => window.history.back()}
+          isStandaloneApp={isAppWelcomeScreen}
+          onBackToLanding={isAppWelcomeScreen ? undefined : () => window.history.back()}
           theme={theme}
           onThemeChange={setTheme}
         />

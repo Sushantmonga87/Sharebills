@@ -182,7 +182,6 @@ export default function LandingPage({
   onLogin,
   onGetStarted,
   onCreateAccount,
-  onDownloadApp,
   onInstallApp,
   deferredPromptAvailable = false,
   isAppInstalled = false,
@@ -198,6 +197,8 @@ export default function LandingPage({
   const [splitDemoMode, setSplitDemoMode] = useState('equal');
   const [openFaq, setOpenFaq] = useState(0);
   const [previewModal, setPreviewModal] = useState(null);
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
+  const [installError, setInstallError] = useState('');
 
   // Filter state for redesigned features
   const [featureCategory, setFeatureCategory] = useState('all');
@@ -313,22 +314,45 @@ export default function LandingPage({
     }
   };
 
-  const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      setDeferredPrompt(null);
-      return;
-    }
-    if (deferredPromptAvailable && typeof onInstallApp === 'function') {
-      await onInstallApp();
-      return;
-    }
-    if (typeof onDownloadApp === 'function') {
-      onDownloadApp();
-      return;
-    }
+  const handleInstallClick = () => {
+    setShowInstallInstructions(false);
+    setInstallError('');
     setPreviewModal('install');
+  };
+
+  const handleWebAppInstall = async () => {
+    try {
+      if (deferredPrompt) {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        setDeferredPrompt(null);
+        if (outcome === 'accepted') {
+          setPreviewModal(null);
+          return;
+        }
+      } else if (deferredPromptAvailable && typeof onInstallApp === 'function') {
+        if (await onInstallApp()) {
+          setPreviewModal(null);
+          return;
+        }
+      }
+
+      setShowInstallInstructions(true);
+    } catch (error) {
+      console.error('Web app installation failed:', error);
+      setInstallError('The install prompt could not be opened. Try your browser menu to install the app.');
+      setShowInstallInstructions(true);
+    }
+  };
+
+  const openDesktopWebApp = () => {
+    window.open('https://sharebills.in/', '_blank', 'noopener,noreferrer');
+  };
+
+  const closePreviewModal = () => {
+    setPreviewModal(null);
+    setShowInstallInstructions(false);
+    setInstallError('');
   };
 
   const scrollToSection = (id) => {
@@ -1861,7 +1885,7 @@ export default function LandingPage({
       {previewModal && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
-          onClick={() => setPreviewModal(null)}
+          onClick={closePreviewModal}
         >
           <div
             role="dialog"
@@ -1875,21 +1899,21 @@ export default function LandingPage({
                 <div>
                   <h3 className="text-base font-extrabold">
                     {previewModal === 'install'
-                      ? 'Install Sharebills PWA'
+                      ? 'Get Sharebills'
                       : previewModal === 'login'
                       ? 'Sign in to Sharebills'
                       : 'Create your Sharebills Account'}
                   </h3>
                   <p className="text-xs text-slate-500">
                     {previewModal === 'install'
-                      ? 'Add to Home Screen for instant push alerts'
+                      ? 'Choose the version that works best for you'
                       : 'Google One-Tap or Email & Password'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setPreviewModal(null)}
+                onClick={closePreviewModal}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"
               >
                 <X size={16} />
@@ -1897,21 +1921,81 @@ export default function LandingPage({
             </div>
 
             {previewModal === 'install' ? (
-              <div className="mt-4 space-y-3 text-xs text-slate-600">
-                <div className="rounded-2xl border border-[#BDD2C1] bg-[#EEF4EF]/70 p-3.5 text-[#2C503A]">
-                  <p className="font-extrabold">Android / Chrome / Desktop:</p>
-                  <p className="mt-1">
-                    Tap the browser menu (⋮) or address bar icon and choose{' '}
-                    <strong>“Install App”</strong> or <strong>“Add to Home Screen”</strong>.
-                  </p>
+              <div className="mt-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={handleWebAppInstall}
+                  className="flex w-full items-start gap-3 rounded-2xl border border-[#BDD2C1] bg-[#EEF4EF]/70 p-4 text-left transition-colors hover:bg-[#DDE9DF]"
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-[#356447] shadow-sm">
+                    <Smartphone size={19} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-extrabold text-[#2C503A]">
+                      Install Sharebills Lite (web app)
+                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                      Quick, lightweight access from your home screen. No app store needed.
+                    </span>
+                  </span>
+                </button>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
+                    <Globe size={19} />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-extrabold text-slate-900">
+                      Windows / Mac (web app)
+                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                      Open Sharebills in Chrome or Edge, then use the browser menu to install it.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={openDesktopWebApp}
+                      className="mt-3 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 transition-colors hover:bg-slate-100"
+                    >
+                      Open web app
+                    </button>
+                  </span>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
-                  <p className="font-extrabold text-slate-900">iOS Safari:</p>
-                  <p className="mt-1">
-                    Tap the <strong>Share</strong> button at the bottom of Safari and select{' '}
-                    <strong>“Add to Home Screen”</strong>.
-                  </p>
-                </div>
+
+                <a
+                  href="/sharebills-android.apk"
+                  download="Sharebills-Android.apk"
+                  onClick={closePreviewModal}
+                  className="block rounded-2xl border border-[#8EB89A] bg-[#EEF4EF] p-4 transition-colors hover:bg-[#DDE9DF]"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-[#356447] shadow-sm">
+                      <Download size={19} />
+                    </span>
+                    <span className="flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-extrabold text-[#2C503A]">Install Android APK</span>
+                        <span className="rounded-full bg-[#356447] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
+                          Recommended
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                        Recommended for Android. Download and open the APK; allow installs from this browser if prompted.
+                      </span>
+                      <span className="mt-3 inline-flex rounded-lg bg-[#356447] px-3 py-2 text-xs font-bold text-white">
+                        Download APK
+                      </span>
+                    </span>
+                  </div>
+                </a>
+
+                {showInstallInstructions && (
+                  <div
+                    role={installError ? 'alert' : undefined}
+                    className="rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600"
+                  >
+                    {installError || 'To install the web app, open your browser menu and choose “Install app” or “Add to Home Screen”. On iPhone or iPad, use Safari’s Share menu and choose “Add to Home Screen”.'}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -1928,7 +2012,7 @@ export default function LandingPage({
 
             <button
               type="button"
-              onClick={() => setPreviewModal(null)}
+              onClick={closePreviewModal}
               className="mt-5 w-full rounded-2xl bg-[#3E7754] py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-[#356447]"
             >
               Got it

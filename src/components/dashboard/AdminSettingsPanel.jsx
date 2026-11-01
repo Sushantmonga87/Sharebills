@@ -33,8 +33,8 @@ export default function AdminSettingsPanel({
             </p>
           )}
           <div className="space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
                   <Bell size={17} />
                 </div>
@@ -43,13 +43,13 @@ export default function AdminSettingsPanel({
                   <p className="text-[11px] text-slate-500">Verify delivery and device permissions.</p>
                 </div>
               </div>
-              <div className="flex flex-shrink-0 items-center gap-2">
+              <div className="flex w-full gap-2 sm:w-auto sm:flex-shrink-0">
                 {!user?.notificationsPaused && typeof Notification !== 'undefined' && Notification.permission === 'granted' && (
                   <button
                     type="button"
                     onClick={onEnablePush}
                     disabled={settingUpPush}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    className="min-h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60 sm:flex-initial"
                   >
                     {settingUpPush ? 'Setting up…' : 'Refresh setup'}
                   </button>
@@ -58,14 +58,14 @@ export default function AdminSettingsPanel({
                   type="button"
                   onClick={onTestPush}
                   disabled={testingPush}
-                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="min-h-10 flex-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 sm:flex-initial"
                 >
                   {testingPush ? 'Testing…' : 'Test push'}
                 </button>
               </div>
             </div>
             {testPushStatus && (
-              <p className={`rounded-lg border p-2.5 font-mono text-xs break-all ${
+              <p className={`rounded-lg border p-2.5 text-xs leading-relaxed break-words ${
                 testPushStatus.startsWith('Success')
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                   : testPushStatus.startsWith('Error') || testPushStatus.startsWith('Trigger Error')
