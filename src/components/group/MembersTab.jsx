@@ -206,11 +206,14 @@ export default function MembersTab({
       showToast('Settle your balance before leaving the group.', 'error');
       return;
     }
+    if (!onLeaveGroup) {
+      showToast('Leaving this group is unavailable right now. Please try again.', 'error');
+      return;
+    }
+
     setLeaving(true);
     try {
-      if (onLeaveGroup) {
-        await onLeaveGroup(group.id, currentUser.id);
-      }
+      await onLeaveGroup(group.id, currentUser.id);
       showToast('You have left the group.');
     } catch (error) {
       showToast(error.message || 'Could not leave group', 'error');

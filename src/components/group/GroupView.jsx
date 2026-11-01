@@ -46,6 +46,7 @@ export default function GroupView({
   onResolveExpenseDispute,
   onDeleteGroup,
   onUpdateGroup,
+  onLeaveGroup,
   onSendNotification,
   users,
   currentUser,
@@ -495,6 +496,7 @@ export default function GroupView({
               onDeleteRent={onDeleteRent}
               onUpdateGroup={onUpdateGroup}
               onDeleteGroup={onDeleteGroup}
+              onLeaveGroup={onLeaveGroup}
               showToast={showToast}
             />
           )}

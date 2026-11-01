@@ -995,6 +995,76 @@ export default function App() {
     });
   };
 
+  const leaveGroup = async (groupId, memberId) => {
+    if (!activeUserId || memberId !== activeUserId) {
+      throw new Error('You can only leave a group from your own account.');
+    }
+    if (!groupId || !memberId) {
+      throw new Error('Could not identify this group or your account. Please try again.');
+    }
+
+    if (db) {
+      const groupRef = doc(db, 'groups', groupId);
+      const expenseSnapshot = await getDocs(query(
+        collection(db, 'expenses'),
+        where('groupId', '==', groupId),
+      ));
+      const groupExpenses = expenseSnapshot.docs.map((expenseDoc) => ({
+        id: expenseDoc.id,
+        ...expenseDoc.data(),
+      }));
+
+      await runTransaction(db, async (transaction) => {
+        const groupSnapshot = await transaction.get(groupRef);
+        if (!groupSnapshot.exists()) throw new Error('This group no longer exists.');
+
+        const group = { id: groupSnapshot.id, ...groupSnapshot.data() };
+        if (!Array.isArray(group.members) || !group.members.includes(memberId)) {
+          throw new Error('You are no longer a member of this group.');
+        }
+        if (group.createdBy === memberId) {
+          throw new Error('The group admin cannot leave. Delete the group or transfer admin ownership first.');
+        }
+
+        const { balances } = calculateSettlements(groupExpenses, group.members);
+        if (Math.abs(balances[memberId] || 0) >= GROUP_DELETE_BALANCE_TOLERANCE) {
+          throw new Error('Settle your balance before leaving the group.');
+        }
+
+        transaction.update(groupRef, {
+          members: group.members.filter((id) => id !== memberId),
+        });
+      });
+    } else {
+      const group = groups.find((item) => item.id === groupId);
+      if (!group) throw new Error('This group no longer exists.');
+      if (!Array.isArray(group.members) || !group.members.includes(memberId)) {
+        throw new Error('You are no longer a member of this group.');
+      }
+      if (group.createdBy === memberId) {
+        throw new Error('The group admin cannot leave. Delete the group or transfer admin ownership first.');
+      }
+
+      const groupExpenses = expenses.filter((expense) => expense.groupId === groupId);
+      const { balances } = calculateSettlements(groupExpenses, group.members);
+      if (Math.abs(balances[memberId] || 0) >= GROUP_DELETE_BALANCE_TOLERANCE) {
+        throw new Error('Settle your balance before leaving the group.');
+      }
+
+      const updatedGroup = {
+        ...group,
+        members: group.members.filter((id) => id !== memberId),
+      };
+      setGroups((previous) => {
+        const next = previous.map((item) => (item.id === groupId ? updatedGroup : item));
+        localStorage.setItem('rs_groups', JSON.stringify(next));
+        return next;
+      });
+    }
+
+    navigateTo({ view: 'dashboard', dashboardTab: 'groups' }, { replace: true });
+  };
+
   const saveExpense = async (newExpense) => {
     const expense = { ...newExpense, createdBy: newExpense.createdBy || activeUserId };
     if (db) {
@@ -1905,6 +1975,7 @@ export default function App() {
             onResolveExpenseDispute={resolveExpenseDispute}
             onDeleteGroup={deleteGroup}
             onUpdateGroup={updateGroup}
+            onLeaveGroup={leaveGroup}
             onSendNotification={saveNotifications}
             users={users}
             currentUser={activeUser}
