@@ -1838,7 +1838,7 @@ export default function App() {
     >
       <Toast toast={toast} />
       {!isOnline && <OfflineNotice />}
-      {webNotificationPromptOpen && (
+      {webNotificationPromptOpen && !isNativeApp && activeUser && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
           <section
             role="dialog"
